@@ -1,0 +1,3 @@
+Worker is already deployed on CloudFlare
+In this Tool, choose Custom URL and provide the following URL:
+https://kobo.hammadibrahim.workers.dev
