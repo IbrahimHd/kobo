@@ -1,0 +1,1509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KoboToolbox Data Tool</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f3; color: #1a1a1a; min-height: 100vh; padding: 2rem 15%; }
+  @media (max-width: 900px) { body { padding: 1.5rem 5%; } }
+  @media (max-width: 600px) { body { padding: 1rem 3%; } }
+  .container { max-width: 780px; margin: 0 auto; width: 100%; }
+  header { margin-bottom: 1.75rem; }
+  header h1 { font-size: 22px; font-weight: 600; color: #0c1a2e; display: flex; align-items: center; gap: 10px; }
+  header p { font-size: 13px; color: #666; margin-top: 4px; }
+  .card { background: #fff; border: 1px solid #e4e2dc; border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1rem; }
+  .card-title { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .9rem; display: flex; align-items: center; gap: 8px; }
+  .step-badge { width: 20px; height: 20px; border-radius: 50%; background: #f0ede6; border: 1px solid #d8d4cc; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: #666; flex-shrink: 0; }
+  .step-badge.done { background: #E1F5EE; border-color: #1D9E75; color: #0F6E56; }
+  .field-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
+  .field-row label { font-size: 13px; color: #555; width: 120px; flex-shrink: 0; }
+  .field-row input, .field-row select { flex: 1; font-size: 13px; height: 36px; padding: 0 10px; border: 1px solid #ddd; border-radius: 8px; background: #fafaf8; outline: none; color: #1a1a1a; transition: border-color .15s; }
+  .field-row input:focus, .field-row select:focus { border-color: #378ADD; box-shadow: 0 0 0 3px rgba(55,138,221,0.12); }
+  input[type=password] { letter-spacing: .1em; }
+  .connect-row { display: flex; gap: 10px; align-items: center; margin-top: .5rem; }
+  .btn-connect { padding: 8px 18px; background: #185FA5; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 7px; transition: background .15s; white-space: nowrap; }
+  .btn-connect:hover { background: #0C447C; }
+  .btn-connect:disabled { background: #ccc; cursor: not-allowed; }
+  .conn-status { display: flex; align-items: center; gap: 7px; font-size: 13px; }
+  .conn-status.idle { color: #aaa; }
+  .conn-status.loading { color: #185FA5; }
+  .conn-status.success { color: #0F6E56; }
+  .conn-status.error { color: #A32D2D; }
+  .conn-status.warning { color: #854F0B; }
+  .toggle-row { display: flex; gap: 8px; margin-bottom: .9rem; }
+  .toggle-btn { flex: 1; padding: 9px 12px; font-size: 13px; border-radius: 8px; border: 1px solid #ddd; background: #fafaf8; color: #666; cursor: pointer; transition: all .15s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .toggle-btn:hover { border-color: #378ADD; color: #185FA5; }
+  .toggle-btn.active { border-color: #378ADD; background: #EBF4FC; color: #185FA5; font-weight: 600; }
+  /* Operation selector — larger cards */
+  .op-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 0; }
+  .op-card { border: 2px solid #e4e2dc; border-radius: 12px; padding: 1.25rem; cursor: pointer; transition: all .2s; background: #fafaf8; text-align: center; }
+  .op-card:hover { border-color: #378ADD; background: #EBF4FC; }
+  .op-card.active { border-color: #185FA5; background: #EBF4FC; }
+  .op-card svg { display: block; margin: 0 auto .6rem; }
+  .op-card .op-title { font-size: 14px; font-weight: 600; color: #0c1a2e; margin-bottom: 4px; }
+  .op-card.active .op-title { color: #185FA5; }
+  .op-card .op-desc { font-size: 12px; color: #888; line-height: 1.5; }
+  .op-card.active .op-desc { color: #378ADD; }
+  .upload-zone { border: 2px dashed #ccc; border-radius: 10px; padding: 2rem; text-align: center; cursor: pointer; transition: all .15s; background: #fafaf8; }
+  .upload-zone:hover { border-color: #378ADD; background: #EBF4FC; }
+  .upload-zone svg { color: #bbb; display: block; margin: 0 auto 10px; }
+  .upload-zone p { font-size: 13px; color: #888; }
+  .upload-zone span { font-size: 11px; color: #bbb; display: block; margin-top: 4px; }
+  .upload-zone.drag-over { border-color: #185FA5; background: #d0e8f8; transform: scale(1.01); }
+  .upload-zone.has-file { border-style: solid; border-color: #1D9E75; background: #edfaf4; }
+  .upload-zone.has-file svg, .upload-zone.has-file p { color: #0F6E56; }
+  .mapping-grid { display: grid; grid-template-columns: 1fr 20px 1fr; gap: 8px; align-items: center; margin-bottom: 4px; }
+  .mapping-grid-custom { display: grid; grid-template-columns: 1fr 20px 1fr 1fr; gap: 8px; align-items: center; margin-bottom: 4px; }
+  .mapping-row-wrap { margin-bottom: 7px; }
+  .custom-name-inline { display: none; }
+  .custom-name-inline input { width: 100%; font-size: 12px; height: 32px; border: 1px solid #378ADD; border-radius: 7px; padding: 0 8px; background: #fafaf8; outline: none; }
+  .custom-name-inline input:focus { box-shadow: 0 0 0 3px rgba(55,138,221,0.12); }
+  .col-label { font-size: 12px; padding: 6px 10px; background: #f5f4f0; border-radius: 7px; border: 1px solid #e4e2dc; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mapping-grid svg { color: #bbb; }
+  .mapping-grid select { font-size: 12px; height: 32px; padding: 0 8px; }
+  .repeat-add-btn { font-size: 12px; color: #185FA5; background: none; border: none; cursor: pointer; padding: 4px 0; display: flex; align-items: center; gap: 5px; margin-top: 4px; }
+  .repeat-add-btn:hover { text-decoration: underline; }
+  .btn-primary { width: 100%; padding: 11px; background: #185FA5; color: #fff; border: none; border-radius: 9px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background .15s; }
+  .btn-primary:hover:not(:disabled) { background: #0C447C; }
+  .btn-primary:disabled { background: #e0ddd6; color: #aaa; cursor: not-allowed; }
+  .btn-primary.teal { background: #6B4EAD; }
+  .btn-primary.teal:hover:not(:disabled) { background: #533C8A; }
+  .progress-wrap { background: #eee; border-radius: 20px; height: 8px; margin: 1rem 0; overflow: hidden; }
+  .progress-bar { height: 100%; background: #1D9E75; border-radius: 20px; width: 0%; transition: width .3s; }
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 1rem; }
+  .stat { background: #f5f4f0; border-radius: 9px; padding: .65rem .85rem; }
+  .stat .val { font-size: 22px; font-weight: 600; color: #1a1a1a; }
+  .stat .lbl { font-size: 11px; color: #888; margin-top: 2px; }
+  .log-wrap { max-height: 260px; overflow-y: auto; border: 1px solid #e4e2dc; border-radius: 9px; }
+  .log-row { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 8px; padding: 7px 12px; border-bottom: 1px solid #f0ede6; font-size: 12px; }
+  .log-row:last-child { border-bottom: none; }
+  .log-row .idx { color: #aaa; font-variant-numeric: tabular-nums; }
+  .log-row .msg { color: #555; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge { font-size: 10px; font-weight: 600; padding: 2px 9px; border-radius: 20px; }
+  .badge.ok { background: #E1F5EE; color: #0F6E56; }
+  .badge.err { background: #FCEBEB; color: #A32D2D; }
+  .badge.pend { background: #f5f4f0; color: #888; }
+  .hint { font-size: 12px; color: #aaa; margin-top: 5px; }
+  .info-box { font-size: 12px; padding: 9px 12px; border-radius: 8px; margin-top: .5rem; border-left: 3px solid; }
+  .info-box.warning { background: #FAEEDA; color: #633806; border-color: #BA7517; }
+  .info-box.error { background: #FCEBEB; color: #791F1F; border-color: #E24B4A; }
+  .info-box.success { background: #E1F5EE; color: #085041; border-color: #1D9E75; }
+  .info-box.info { background: #EBF4FC; color: #0C447C; border-color: #378ADD; }
+  .btn-sec { flex: 1; padding: 9px; font-size: 13px; border-radius: 8px; border: 1px solid #ddd; background: #fafaf8; color: #555; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: background .15s; }
+  .btn-sec:hover { background: #f0ede6; }
+  .ctrl-row { display: flex; gap: 8px; margin-top: .75rem; }
+  .btn-pause { flex: 1; padding: 10px; background: #FAEEDA; color: #854F0B; border: 1px solid #BA7517; border-radius: 9px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; transition: background .15s; }
+  .btn-pause:hover { background: #f5ddb8; }
+  .btn-cancel { flex: 1; padding: 10px; background: #FCEBEB; color: #A32D2D; border: 1px solid #E24B4A; border-radius: 9px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; transition: background .15s; }
+  .btn-cancel:hover { background: #f8d4d4; }
+  .form-meta { font-size: 12px; color: #555; margin-top: 8px; padding: 8px 12px; background: #f5f4f0; border-radius: 8px; display: flex; gap: 16px; flex-wrap: wrap; }
+  .form-meta span { color: #888; }
+  optgroup { font-weight: 600; font-style: normal; color: #555; }
+  .preview-table-wrap { overflow-x: auto; font-size: 11px; border: 1px solid #e4e2dc; border-radius: 8px; }
+  .preview-table-wrap table { width: 100%; border-collapse: collapse; }
+  .preview-table-wrap th { padding: 5px 9px; background: #f5f4f0; border-bottom: 1px solid #e4e2dc; font-size: 11px; font-weight: 600; white-space: nowrap; color: #666; text-align: left; }
+  .preview-table-wrap td { padding: 5px 9px; border-bottom: 1px solid #f0ede6; font-size: 11px; color: #333; white-space: nowrap; max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+  /* Setup guide */
+  .setup-guide { background: #EBF4FC; border: 1px solid #b5d4f4; border-radius: 10px; margin-bottom: 1rem; overflow: hidden; }
+  .setup-guide summary { padding: .75rem 1rem; font-size: 13px; font-weight: 600; color: #185FA5; cursor: pointer; display: flex; align-items: center; gap: 8px; list-style: none; user-select: none; }
+  .setup-guide summary::-webkit-details-marker { display: none; }
+  .setup-guide summary .chevron { transition: transform .2s; font-size: 11px; margin-left: auto; color: #378ADD; }
+  .setup-guide[open] summary .chevron { transform: rotate(180deg); }
+  .setup-guide-body { padding: .75rem 1rem 1rem; border-top: 1px solid #b5d4f4; }
+  .setup-guide-body > p { font-size: 13px; color: #0C447C; margin-bottom: .75rem; margin-top: .25rem; }
+  .tab-bar { display: flex; gap: 0; margin-bottom: 1rem; border-bottom: 2px solid #b5d4f4; }
+  .tab-btn { padding: 8px 20px; font-size: 13px; font-weight: 600; color: #378ADD; background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .tab-btn:hover { color: #185FA5; background: rgba(55,138,221,0.06); border-radius: 6px 6px 0 0; }
+  .tab-btn.active { color: #185FA5; border-bottom-color: #185FA5; background: rgba(55,138,221,0.08); border-radius: 6px 6px 0 0; }
+  .tab-badge { font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 20px; background: #185FA5; color: #fff; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  .setup-step { display: flex; gap: 10px; align-items: flex-start; margin-bottom: .65rem; }
+  .setup-step-num { width: 22px; height: 22px; border-radius: 50%; background: #185FA5; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+  .setup-step-text { font-size: 13px; color: #0C447C; line-height: 1.6; }
+  .setup-step-text code { background: #fff; border: 1px solid #b5d4f4; border-radius: 5px; padding: 2px 7px; font-family: "Consolas","Courier New",monospace; font-size: 12px; color: #185FA5; cursor: pointer; display: inline-block; }
+  .setup-step-text code:hover { background: #185FA5; color: #fff; border-color: #185FA5; }
+  .tab-desc { font-size: 13px; color: #0C447C; background: rgba(55,138,221,0.07); border-radius: 7px; padding: 8px 12px; margin-bottom: .9rem; }
+  .setup-note { font-size: 12px; color: #378ADD; background: #fff; border: 1px solid #b5d4f4; border-radius: 7px; padding: 7px 10px; margin-top: .75rem; }
+  .copy-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #0C447C; color: #fff; font-size: 12px; font-weight: 600; padding: 7px 18px; border-radius: 20px; opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 999; }
+  .copy-toast.show { opacity: 1; }
+  /* Hidden by default */
+  #steps-container { display: none; }
+  #sec-survey-mode { display: none; }
+  #sec-map { display: block; }
+  #sec-results { display: none; }
+  #custom-url-row { display: none; }
+  #range-inputs { display: none; margin-bottom: 8px; }
+  #range-inputs-csv { display: none; margin-bottom: 8px; }
+  #repeat-sheets-wrap { display: none; margin-top: .9rem; }
+  #preview-wrap { display: none; margin-top: 1rem; }
+  #sheet-selector { display: none; margin-top: 1rem; }
+  #retry-btn { display: none; }
+  #hidden-file { display: none; }
+  .remove-btn { background: none; border: none; color: #bbb; cursor: pointer; padding: 2px 6px; border-radius: 4px; font-size: 15px; }
+  .remove-btn:hover { color: #E24B4A; background: #fff0f0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>
+      <svg width="22" height="22" fill="none" stroke="#185FA5" stroke-width="2" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+      KoboToolbox Data Tool
+    </h1>
+    <p>Bulk submission and editing of KoboToolbox records — runs entirely in your browser</p>
+  </header>
+
+  <!-- Step 1: Operation selector -->
+  <div class="card">
+    <div class="card-title"><span class="step-badge" id="badge-1">1</span> What would you like to do?</div>
+    <div class="op-row">
+      <div class="op-card" id="op-submit" onclick="setOperation('submit')">
+        <svg width="28" height="28" fill="none" stroke="#185FA5" stroke-width="1.8" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="12" y2="18"/><line x1="15" y1="15" x2="12" y2="18"/></svg>
+        <div class="op-title">New Submissions</div>
+        <div class="op-desc">Import new records into KoboToolbox from an Excel file via ODK XML ZIP upload</div>
+      </div>
+      <div class="op-card" id="op-edit" onclick="setOperation('edit')">
+        <svg width="28" height="28" fill="none" stroke="#BA7517" stroke-width="1.8" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        <div class="op-title">Edit Existing Records</div>
+        <div class="op-desc">Bulk-update field values in existing KoboToolbox submissions via API</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Steps container — shown after operation is chosen -->
+  <div id="steps-container">
+
+    <!-- Step 2: Setup guide (context-aware) -->
+    <details class="setup-guide" id="setup-guide">
+      <summary>
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span id="guide-title">Setup guide</span>
+        <span class="chevron">&#9660;</span>
+      </summary>
+      <div class="setup-guide-body">
+        <p id="guide-intro"></p>
+
+        <!-- Submit guide: tabbed (ZIP needs nothing / Worker for API tab) -->
+        <div id="guide-submit">
+          <div class="tab-bar">
+            <button class="tab-btn active" onclick="switchTab('cf',this)">
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+              Cloudflare Worker <span class="tab-badge">For API tab</span>
+            </button>
+            <button class="tab-btn" onclick="switchTab('py',this)">
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              Python Local Server
+            </button>
+          </div>
+          <div class="tab-panel active" id="tab-cf">
+            <div class="tab-desc">&#9432; The ZIP export works from any browser with no setup needed. The Cloudflare Worker is only needed for the <strong>Edit Existing Records</strong> operation.</div>
+            <div class="setup-step"><div class="setup-step-num">1</div><div class="setup-step-text">Go to <a href="https://workers.cloudflare.com" target="_blank" rel="noopener" style="color:#185FA5;font-weight:600;text-decoration:underline">workers.cloudflare.com</a> and sign up for a free account.</div></div>
+            <div class="setup-step"><div class="setup-step-num">2</div><div class="setup-step-text">Click <strong>Create Worker</strong> and delete all the default code in the editor.</div></div>
+            <div class="setup-step"><div class="setup-step-num">3</div><div class="setup-step-text">Download and open <strong>kobo_cors_proxy_worker.js</strong>, copy all its contents, and paste into the Cloudflare editor.</div></div>
+            <div class="setup-step"><div class="setup-step-num">4</div><div class="setup-step-text">Click <strong>Save &amp; Deploy</strong>. Copy your permanent Worker URL:<br><code style="font-family:monospace;font-size:12px">https://kobo-proxy.YOUR-NAME.workers.dev</code></div></div>
+            <div class="setup-step"><div class="setup-step-num">5</div><div class="setup-step-text">In the Connection section, set Server to <strong>Custom URL…</strong>, paste your Worker URL, and click <strong>Test connection</strong>.</div></div>
+            <div class="setup-note">&#9432; The Worker only forwards requests to eu.kobotoolbox.org. Your API token is never stored or logged.</div>
+          </div>
+          <div class="tab-panel" id="tab-py">
+            <div class="tab-desc">&#128195; Session-based. Run a local server — must repeat each session.</div>
+            <div class="setup-step"><div class="setup-step-num">1</div><div class="setup-step-text">Make sure <a href="https://www.python.org/downloads/" target="_blank" rel="noopener" style="color:#185FA5;font-weight:600;text-decoration:underline">Python</a> is installed. Open a terminal (Windows: Win+R → cmd).</div></div>
+            <div class="setup-step"><div class="setup-step-num">2</div><div class="setup-step-text">Navigate to the folder where this file is saved:<br><code onclick="copyCode(this)">cd C:\Users\YourName\Downloads</code></div></div>
+            <div class="setup-step"><div class="setup-step-num">3</div><div class="setup-step-text">Start the local server:<br><code onclick="copyCode(this)">python -m http.server 8080</code></div></div>
+            <div class="setup-step"><div class="setup-step-num">4</div><div class="setup-step-text">Open Chrome and go to:<br><code onclick="copyCode(this)">http://localhost:8080/kobo_tool.html</code><br><span style="font-size:12px;color:#378ADD;display:inline-block;margin-top:5px">&#9432; Replace the filename if you renamed this file.</span></div></div>
+            <div class="setup-step"><div class="setup-step-num">5</div><div class="setup-step-text">Keep the terminal open while using the tool. Next time, repeat steps 3–4 only.</div></div>
+            <div class="setup-step"><div class="setup-step-num">6</div><div class="setup-step-text"><strong>Still blocked on localhost?</strong> Run a CORS proxy in a second terminal:<br><code onclick="copyCode(this)">npx local-cors-proxy --proxyUrl https://eu.kobotoolbox.org --port 8010</code><br>Then set the server URL to <code onclick="copyCode(this)">http://localhost:8010</code>. Requires <a href="https://nodejs.org" target="_blank" rel="noopener" style="color:#185FA5;font-weight:600;text-decoration:underline">Node.js</a>.</div></div>
+            <div class="setup-note">&#9432; Click any command above to copy it to your clipboard.</div>
+          </div>
+        </div>
+
+        <!-- Edit guide: Cloudflare required -->
+        <div id="guide-edit" style="display:none">
+          <div class="info-box info" style="margin-bottom:.9rem">&#9432; The edit tool uses KoboToolbox's API directly — the <strong>Cloudflare Worker proxy is required</strong> to relay requests from your browser to KoboToolbox.</div>
+          <div class="setup-step"><div class="setup-step-num">1</div><div class="setup-step-text">Go to <a href="https://workers.cloudflare.com" target="_blank" rel="noopener" style="color:#185FA5;font-weight:600;text-decoration:underline">workers.cloudflare.com</a> and sign up for a free account.</div></div>
+          <div class="setup-step"><div class="setup-step-num">2</div><div class="setup-step-text">Click <strong>Create Worker</strong> and delete all the default code in the editor.</div></div>
+          <div class="setup-step"><div class="setup-step-num">3</div><div class="setup-step-text">Download and open <strong>kobo_cors_proxy_worker.js</strong>, copy all its contents, and paste into the Cloudflare editor.</div></div>
+          <div class="setup-step"><div class="setup-step-num">4</div><div class="setup-step-text">Click <strong>Save &amp; Deploy</strong>. Copy your Worker URL:<br><code style="font-family:monospace;font-size:12px">https://kobo-proxy.YOUR-NAME.workers.dev</code></div></div>
+          <div class="setup-step"><div class="setup-step-num">5</div><div class="setup-step-text">In the Connection section, set Server to <strong>Custom URL…</strong>, paste your Worker URL, and click <strong>Test connection</strong>.</div></div>
+          <div class="setup-step"><div class="setup-step-num">6</div><div class="setup-step-text">Your Excel file must include a <strong>_id</strong> column (KoboToolbox submission ID) alongside the fields you want to update. Export your existing data from KoboToolbox first to get those IDs.</div></div>
+          <div class="setup-note">&#9432; The Worker is required for edit operations — all PATCH calls go through it. Your token is never stored.</div>
+        </div>
+
+      </div>
+    </details>
+
+    <div class="copy-toast" id="copy-toast">Copied to clipboard ✓</div>
+
+    <!-- Step 3: Connection -->
+    <!-- Step 1: Connection -->
+    <div class="card" id="card-conn">
+      <div class="card-title"><span class="step-badge" id="badge-conn">3</span> KoboToolbox connection</div>
+      <div class="field-row">
+        <label>API Token</label>
+        <input type="password" id="api-token" placeholder="Paste your API token…" oninput="resetConnStatus()" />
+      </div>
+      <div class="field-row">
+        <label>Server</label>
+        <select id="server-url" onchange="onServerChange(); resetConnStatus()">
+          <option value="https://eu.kobotoolbox.org" selected>eu.kobotoolbox.org (EU — default)</option>
+          <option value="https://kf.kobotoolbox.org">kf.kobotoolbox.org (Global)</option>
+          <option value="https://kobo.humanitarianresponse.info">kobo.humanitarianresponse.info (UNHCR/OCHA)</option>
+          <option value="custom">Custom URL…</option>
+        </select>
+      </div>
+      <div class="field-row" id="custom-url-row">
+        <label>Custom URL</label>
+        <input type="text" id="custom-url" placeholder="https://…" oninput="resetConnStatus()" />
+      </div>
+      <div class="field-row">
+        <label>Form UID</label>
+        <input type="text" id="form-uid" placeholder="e.g. aXmKz7p9Qn…" oninput="resetConnStatus()" />
+      </div>
+      <p class="hint" style="margin-bottom:.85rem">&#9432; Find the Form UID in your form's URL: /forms/<strong>UID</strong>/</p>
+      <div class="connect-row">
+        <button class="btn-connect" id="btn-connect" onclick="testConnection()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0114.08 0"/><path d="M1.42 9a16 16 0 0121.16 0"/><path d="M8.53 16.11a6 6 0 016.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/></svg>
+          Test connection
+        </button>
+        <div class="conn-status idle" id="conn-status"><span id="conn-status-text">Not tested yet</span></div>
+      </div>
+      <div id="conn-info-box" style="display:none"></div>
+      <div id="form-meta" style="display:none" class="form-meta"></div>
+    </div>
+
+    <!-- Step 4: Survey structure (submissions only) -->
+    <div class="card" id="sec-survey-mode">
+      <div class="card-title"><span class="step-badge">4</span> Survey structure</div>
+      <div class="toggle-row">
+        <button class="toggle-btn active" id="btn-flat" onclick="setMode('flat')">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          Flat survey
+        </button>
+        <button class="toggle-btn" id="btn-repeat" onclick="setMode('repeat')">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="5" rx="1"/><rect x="3" y="10" width="18" height="5" rx="1"/><rect x="3" y="17" width="18" height="5" rx="1"/></svg>
+          With repeat groups
+        </button>
+      </div>
+      <div id="mode-desc-flat" style="font-size:13px;color:#666">All responses in a single row per submission. Each Excel row = one submission.</div>
+      <div id="mode-desc-repeat" style="display:none;font-size:13px;color:#666">Submissions have repeat group sections (e.g. household members). Use a separate sheet per repeat group.</div>
+    </div>
+
+    <!-- Step 5: Upload Excel -->
+    <div class="card">
+      <div class="card-title"><span class="step-badge" id="badge-upload">5</span> Upload Excel file</div>
+      <div id="edit-upload-hint" style="display:none;margin-bottom:1rem" class="info-box info">
+        &#9432; Your Excel file must include a <strong>_id</strong> column containing KoboToolbox submission IDs. Export your existing data from KoboToolbox first to obtain these IDs.
+      </div>
+      <div class="upload-zone" id="upload-zone" onclick="document.getElementById('hidden-file').click()">
+        <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        <p id="upload-label">Click or drag &amp; drop your .xlsx file here</p>
+        <span>Supports .xlsx files — multiple sheets supported</span>
+      </div>
+      <input type="file" id="hidden-file" accept=".xlsx" onchange="handleFile(event)" />
+      <div id="sheet-selector">
+        <div class="field-row" style="margin-top:1rem">
+          <label>Main sheet</label>
+          <select id="main-sheet-select" onchange="loadMainSheet()"></select>
+        </div>
+        <div id="repeat-sheets-wrap">
+          <p style="font-size:12px;color:#888;margin-bottom:.5rem">Repeat group sheets:</p>
+          <div id="repeat-sheet-list"></div>
+          <button class="repeat-add-btn" onclick="addRepeatSheet()">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add repeat group sheet
+          </button>
+        </div>
+      </div>
+      <div id="preview-wrap">
+        <p style="font-size:12px;color:#888;margin-bottom:.5rem">Preview — first 3 rows:</p>
+        <div class="preview-table-wrap" id="preview-table"></div>
+      </div>
+    </div>
+
+    <!-- Step 6: Column mapping -->
+    <div class="card" id="sec-map">
+      <div class="card-title"><span class="step-badge" id="badge-map">6</span> Column mapping</div>
+      <p style="font-size:12px;color:#888;margin-bottom:.85rem">Map your Excel columns to Kobo field names. Leave "— skip —" to exclude a column.</p>
+      <div id="map-list">
+        <p style="font-size:13px;color:#aaa;text-align:center;padding:1.25rem 0">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="display:inline-block;vertical-align:-4px;margin-right:6px;color:#ccc"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Column mapping will appear here after uploading your Excel file in Step 5.
+        </p>
+      </div>
+    </div>
+
+    <!-- Step 7: Action -->
+    <div class="card">
+      <div class="card-title"><span class="step-badge">7</span> <span id="action-title">Action</span></div>
+
+      <!-- Submission action -->
+      <div id="action-submit">
+        <!-- ZIP Export — only supported method for new submissions on KoboToolbox EU -->
+        <div id="mode-csv">
+          <div class="info-box success" style="margin-bottom:1rem">&#9432; Exports rows as ODK XML instances in a ZIP file. Upload to KoboToolbox's bulk-submission-form — no API restrictions, no CORS issues.</div>
+          <div class="field-row">
+            <label>KoboToolbox username</label>
+            <input type="text" id="kobo-username" placeholder="Your KoboToolbox username…" />
+          </div>
+          <div class="field-row">
+            <label>Rows to export</label>
+            <select id="row-range-csv">
+              <option value="all">All rows</option>
+              <option value="range">Custom range…</option>
+            </select>
+          </div>
+          <div id="range-inputs-csv">
+            <div class="field-row"><label>From row</label><input type="number" id="range-from-csv" value="1" min="1" style="width:80px;flex:none" /></div>
+            <div class="field-row"><label>To row</label><input type="number" id="range-to-csv" value="70" min="1" style="width:80px;flex:none" /></div>
+          </div>
+          <button class="btn-primary" id="export-btn" onclick="exportZip()" disabled>
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export ZIP
+          </button>
+          <div id="csv-export-done" style="display:none;margin-top:1rem">
+            <div class="info-box success" id="zip-done-msg"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Edit action -->
+      <div id="action-edit" style="display:none">
+        <div class="info-box info" style="margin-bottom:1rem">
+          &#9432; Uses <code style="font-size:11px;background:#e8f1fb;padding:1px 5px;border-radius:4px">PATCH /api/v2/assets/{uid}/data/bulk/</code> to update existing submissions.
+          Your Excel must include a <strong>_id</strong> column. One PATCH is fired per field column, updating all matched rows simultaneously.
+        </div>
+        <div class="field-row">
+          <label>Rows to edit</label>
+          <select id="row-range-edit"><option value="all">All rows</option><option value="range">Custom range…</option></select>
+        </div>
+        <div id="range-inputs-edit" style="display:none;margin-bottom:8px">
+          <div class="field-row"><label>From row</label><input type="number" id="range-from-edit" value="1" min="1" style="width:80px;flex:none" /></div>
+          <div class="field-row"><label>To row</label><input type="number" id="range-to-edit" value="70" min="1" style="width:80px;flex:none" /></div>
+        </div>
+        <div class="field-row">
+          <label>Delay (ms)</label>
+          <input type="range" min="0" max="2000" step="100" value="300" id="delay-slider-edit" oninput="document.getElementById('delay-val-edit').textContent=this.value+'ms'" style="flex:1" />
+          <span style="font-size:13px;min-width:48px;text-align:right" id="delay-val-edit">300ms</span>
+        </div>
+        <p class="hint" style="margin-bottom:1rem">&#9432; One PATCH request is sent per mapped field. Each request updates all rows at once.</p>
+        <button class="btn-primary teal" id="edit-btn" onclick="startEdits()" disabled>
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Apply edits
+        </button>
+        <div class="ctrl-row" id="ctrl-row-edit" style="display:none">
+          <button class="btn-pause" id="pause-btn-edit" onclick="togglePauseEdit()">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Pause
+          </button>
+          <button class="btn-cancel" onclick="cancelEdits()">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="card" id="sec-results" style="display:none">
+      <div class="card-title">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Results
+      </div>
+      <div class="stats-row">
+        <div class="stat"><div class="val" id="st-total">0</div><div class="lbl">Total</div></div>
+        <div class="stat"><div class="val" id="st-ok" style="color:#1D9E75">0</div><div class="lbl">OK</div></div>
+        <div class="stat"><div class="val" id="st-err" style="color:#E24B4A">0</div><div class="lbl">Failed</div></div>
+        <div class="stat"><div class="val" id="st-pct">0%</div><div class="lbl">Progress</div></div>
+      </div>
+      <div class="progress-wrap"><div class="progress-bar" id="prog-bar"></div></div>
+      <div class="log-wrap" id="log-wrap"></div>
+      <div style="display:flex;gap:8px;margin-top:1rem">
+        <button class="btn-sec" onclick="downloadLog()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download log
+        </button>
+        <button class="btn-sec" id="retry-btn" onclick="retryFailed()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+          Retry failed
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /steps-container -->
+
+</div><!-- /container -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+let workbook=null, mainData=[], mode='flat', logEntries=[], failedRows=[], allSheets=[], repeatSheetCount=0;
+let koboFields=[], connVerified=false, canSubmit=false, koboIdString='', koboVersion='', koboEnketoUrl='', koboFormUuid='';
+
+// ── Setup guide helpers ───────────────────────────────────────
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+function copyCode(el) {
+  const text = el.innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    const toast = document.getElementById('copy-toast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 1800);
+  });
+}
+function openSetupGuide(tab) {
+  const guide = document.getElementById('setup-guide');
+  if (guide) {
+    guide.open = true;
+    if (tab) {
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      const panel = document.getElementById('tab-' + tab);
+      if (panel) panel.classList.add('active');
+      const btns = document.querySelectorAll('.tab-btn');
+      if (tab === 'cf' && btns[0]) btns[0].classList.add('active');
+      if (tab === 'py' && btns[1]) btns[1].classList.add('active');
+    }
+    guide.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+// ── Connection ──────────────────────────────────────────────
+function onServerChange() {
+  document.getElementById('custom-url-row').style.display =
+    document.getElementById('server-url').value === 'custom' ? 'flex' : 'none';
+}
+document.getElementById('row-range').addEventListener('change', function() {
+  document.getElementById('range-inputs').style.display = this.value === 'range' ? 'block' : 'none';
+});
+
+function getServerUrl() {
+  const val = document.getElementById('server-url').value;
+  return val === 'custom' ? document.getElementById('custom-url').value.replace(/\/$/, '') : val;
+}
+
+function resetConnStatus() {
+  connVerified = false; canSubmit = false; koboFields = []; koboIdString = ''; koboVersion = ''; koboEnketoUrl = ''; koboFormUuid = '';
+  setConnUI('idle', 'Not tested yet');
+  document.getElementById('conn-info-box').style.display = 'none';
+  document.getElementById('form-meta').style.display = 'none';
+  document.getElementById('badge-1').classList.remove('done');
+  refreshSubmitBtn();
+  // Re-build mapping if excel already loaded, to drop kobo suggestions
+  if (mainData.length) buildMapping();
+}
+
+function setConnUI(state, text, iconChar) {
+  const statusEl = document.getElementById('conn-status');
+  const textEl = document.getElementById('conn-status-text');
+  statusEl.className = 'conn-status ' + state;
+  textEl.textContent = text;
+}
+
+async function testConnection() {
+  const token = document.getElementById('api-token').value.trim();
+  const formUid = document.getElementById('form-uid').value.trim();
+  if (!token || !formUid) {
+    showInfoBox('error', 'Please fill in both API Token and Form UID before testing.');
+    return;
+  }
+  const server = getServerUrl();
+  const btn = document.getElementById('btn-connect');
+  btn.disabled = true;
+  setConnUI('loading', 'Connecting…');
+  document.getElementById('conn-info-box').style.display = 'none';
+  document.getElementById('form-meta').style.display = 'none';
+
+  try {
+    // 0. Debug: verify Authorization header reaches the Worker
+    const debugUrl = server + '/debug/';
+    try {
+      const debugResp = await fetch(debugUrl, {
+        method: 'GET',
+        headers: { 'Authorization': 'Token ' + token, 'Accept': 'application/json' }
+      });
+      const debugData = await debugResp.json();
+      const authHeader = debugData.headers && debugData.headers['authorization'];
+      console.log('[KoboDebug] Headers received by Worker:', debugData.headers);
+      console.log('[KoboDebug] Authorization header at Worker:', authHeader || 'MISSING ⚠️');
+      if (!authHeader) {
+        showInfoBox('warning', '⚠️ <strong>Authorization header is being stripped</strong> before reaching the Worker. The token never arrives at Kobo. This is likely a browser CORS pre-flight stripping issue — see console for details.');
+      }
+    } catch(e) {
+      console.log('[KoboDebug] Debug endpoint not available or not a proxy URL — skipping.');
+    }
+
+    // 1. Check token validity + form access
+    const assetUrl = `${server}/api/v2/assets/${formUid}/?format=json`;
+    const resp = await fetch(assetUrl, {
+      headers: { 'Authorization': 'Token ' + token, 'Accept': 'application/json' }
+    });
+
+    if (resp.status === 401) {
+      setConnUI('error', 'Invalid API token');
+      showInfoBox('error', '&#10006; Authentication failed — the API token is invalid or has expired. Please check your token in KoboToolbox &rarr; Account Settings &rarr; Security.');
+      connVerified = false; canSubmit = false;
+      document.getElementById('badge-1').classList.remove('done');
+      btn.disabled = false; return;
+    }
+    if (resp.status === 403) {
+      setConnUI('error', 'Access denied');
+      showInfoBox('error', '&#10006; Your token was accepted but does not have permission to access this form. Make sure the form is shared with your account or that you are the owner.');
+      connVerified = false; canSubmit = false;
+      document.getElementById('badge-1').classList.remove('done');
+      btn.disabled = false; return;
+    }
+    if (resp.status === 404) {
+      setConnUI('error', 'Form not found');
+      showInfoBox('error', '&#10006; No form found with UID <strong>' + formUid + '</strong> on <em>' + server + '</em>. Double-check the Form UID and server selection.');
+      connVerified = false; canSubmit = false;
+      document.getElementById('badge-1').classList.remove('done');
+      btn.disabled = false; return;
+    }
+    if (!resp.ok) {
+      setConnUI('error', 'Server error (' + resp.status + ')');
+      showInfoBox('error', '&#10006; Unexpected server response: ' + resp.status + ' ' + resp.statusText);
+      connVerified = false; canSubmit = false;
+      document.getElementById('badge-1').classList.remove('done');
+      btn.disabled = false; return;
+    }
+
+    const asset = await resp.json();
+
+    // 2. Check submission permission
+    const perms = asset.permissions || [];
+    const permStrings = perms.map(p => (p.permission || p.url || '')).join(' ');
+    const hasSubmit = permStrings.includes('add_submission') || permStrings.includes('submit_to');
+    // Also check via deployment status and owner
+    const isOwner = asset.owner__username && asset.owner__username !== undefined;
+    // If we got this far with 200, the token works; submission perm check is best-effort
+    const deployStatus = asset.deployment_status || '';
+    const deployed = deployStatus === 'deployed';
+
+    // 3. Extract field names, id_string, version, Enketo URL and form UUID
+    koboFields    = [];
+    koboFormUuid  = asset.uuid || asset.deployment__uuid || '';
+    koboVersion   = asset.deployed_version_id || asset.version_id || '';
+    koboEnketoUrl = '';
+
+    // id_string can live in multiple places depending on server version — try all
+    koboIdString =
+      asset.id_string ||                          // top-level (most reliable)
+      asset.deployment__identifier ||             // deployment identifier
+      (asset.content && asset.content.settings &&
+        (Array.isArray(asset.content.settings)
+          ? asset.content.settings[0]?.id_string
+          : asset.content.settings?.id_string)) ||
+      asset.uid ||                                // last resort
+      formUid;
+
+    // version from settings if not at root
+    if (!koboVersion && asset.content && asset.content.settings) {
+      const s = Array.isArray(asset.content.settings) ? asset.content.settings[0] : asset.content.settings;
+      koboVersion = s?.version || '';
+    }
+
+    // Log all candidate fields so we can diagnose mismatches
+    console.log('[KoboConnect] Asset keys:', Object.keys(asset).join(', '));
+    console.log('[KoboConnect] id_string candidates:', {
+      'asset.id_string':              asset.id_string,
+      'asset.deployment__identifier': asset.deployment__identifier,
+      'asset.uid':                    asset.uid,
+      'content.settings.id_string':   asset.content?.settings?.[0]?.id_string || asset.content?.settings?.id_string,
+    });
+    console.log('[KoboConnect] Using id_string:', koboIdString, '| formUuid:', koboFormUuid, '| version:', koboVersion);
+    const survey = (asset.content && asset.content.survey) ? asset.content.survey : [];
+    survey.forEach(field => {
+      const name = field.name || field.$autoname;
+      const type = field.type || '';
+      if (name && !type.startsWith('begin_') && !type.startsWith('end_') && type !== 'note') {
+        const label = (field.label && field.label[0]) ? field.label[0] : name;
+        koboFields.push({ name, label, type });
+      }
+    });
+
+    // 4. Set UI
+    const formName = asset.name || formUid;
+    const questionCount = koboFields.length;
+
+    if (!deployed) {
+      setConnUI('warning', 'Connected — form not deployed');
+      showInfoBox('warning',
+        '&#9888; Connected successfully, but this form is <strong>not deployed</strong> on KoboToolbox. ' +
+        'Submissions may fail until the form is deployed.');
+      connVerified = true; canSubmit = true;
+    } else {
+      setConnUI('success', 'Connected — ' + escHtml(formName));
+      document.getElementById('conn-status').innerHTML =
+        '<svg width="16" height="16" fill="none" stroke="#0F6E56" stroke-width="2.5" viewBox="0 0 24 24" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><polyline points="8 12 11 15 16 9"/></svg>' +
+        '<span style="color:#0F6E56;font-weight:600">Connected</span>';
+      document.getElementById('badge-1').classList.add('done');
+      document.getElementById('conn-info-box').style.display = 'none';
+    }
+
+    // Show form meta
+    const metaEl = document.getElementById('form-meta');
+    metaEl.style.display = 'flex';
+    metaEl.innerHTML =
+      '<span>Form:</span> <strong>' + escHtml(formName) + '</strong>' +
+      '&nbsp;&nbsp;<span>Fields:</span> <strong>' + questionCount + '</strong>' +
+      '&nbsp;&nbsp;<span>Status:</span> <strong>' + (deployed ? 'Deployed' : 'Not deployed') + '</strong>' +
+      (koboEnketoUrl ? '&nbsp;&nbsp;<span>Enketo:</span> <strong style="color:#1D9E75">Found ✓</strong>' : '');
+
+    connVerified = true;
+    refreshSubmitBtn();
+
+    // Re-build mapping with kobo field names now available
+    if (mainData.length) buildMapping();
+
+  } catch(e) {
+    setConnUI('error', 'Connection failed');
+    const onLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    const isFileProtocol = location.protocol === 'file:';
+    const msg = e.message || '';
+    let errorHtml = '';
+
+    if (onLocalhost) {
+      // Running correctly on localhost — CORS is a server-side issue, not a browser file:// issue
+      errorHtml =
+        '&#10006; <strong>Server-side CORS rejection.</strong> You are running on localhost correctly, but <em>' + escHtml(getServerUrl()) + '</em> is not allowing browser-based API requests from <code>localhost</code>.<br><br>' +
+        '<strong>How to fix:</strong><ul style="margin:.5rem 0 .5rem 1.2rem;line-height:1.8">' +
+        '<li>Use the <strong>KoboToolbox desktop app</strong> or a REST client (e.g. <a href="https://www.postman.com" target="_blank" rel="noopener" style="color:#A32D2D">Postman</a>) to verify your token and UID work directly.</li>' +
+        '<li>Ask your KoboToolbox administrator to allow cross-origin requests from <code>localhost</code>, or</li>' +
+        '<li>Host this tool on the <strong>same domain</strong> as your Kobo server (e.g. upload to SharePoint / internal web server) to avoid cross-origin restrictions entirely.</li>' +
+        '</ul>' +
+        '<em style="color:#c0392b;font-size:11px">Details: ' + escHtml(msg) + '</em>';
+    } else if (isFileProtocol) {
+      // Opened as file:// — classic browser CORS restriction
+      errorHtml =
+        '&#10006; <strong>Browser CORS restriction</strong> — the tool is opened as a local file (<code>file://</code>), which blocks API calls. ' +
+        'See the <a href="#setup-guide" onclick="openSetupGuide(\'cf\')" style="color:#A32D2D;font-weight:600;text-decoration:underline">setup guide at the top of the page</a> to fix this in under a minute.<br><br>' +
+        '<em style="color:#c0392b;font-size:11px">Details: ' + escHtml(msg) + '</em>';
+      openSetupGuide('cf');
+    } else {
+      // Hosted elsewhere — network issue or misconfigured server
+      errorHtml =
+        '&#10006; <strong>Could not reach the server.</strong> This may be a network issue, a firewall, or the server rejecting the request.<br><br>' +
+        '<ul style="margin:.5rem 0 .5rem 1.2rem;line-height:1.8">' +
+        '<li>Check your internet connection.</li>' +
+        '<li>Confirm the server URL and Form UID are correct.</li>' +
+        '<li>Try opening <a href="' + escHtml(getServerUrl()) + '" target="_blank" rel="noopener" style="color:#A32D2D">' + escHtml(getServerUrl()) + '</a> directly in your browser to verify the server is reachable.</li>' +
+        '</ul>' +
+        '<em style="color:#c0392b;font-size:11px">Details: ' + escHtml(msg) + '</em>';
+    }
+
+    showInfoBox('error', errorHtml);
+    connVerified = false; canSubmit = false;
+    document.getElementById('badge-1').classList.remove('done');
+  }
+  btn.disabled = false;
+}
+
+function showInfoBox(type, html) {
+  const box = document.getElementById('conn-info-box');
+  box.className = 'info-box ' + type;
+  box.innerHTML = html;
+  box.style.display = 'block';
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Mode ──────────────────────────────────────────────────────
+function setMode(m) {
+  mode = m;
+  document.getElementById('btn-flat').classList.toggle('active', m === 'flat');
+  document.getElementById('btn-repeat').classList.toggle('active', m === 'repeat');
+  document.getElementById('mode-desc-flat').style.display = m === 'flat' ? 'block' : 'none';
+  document.getElementById('mode-desc-repeat').style.display = m === 'repeat' ? 'block' : 'none';
+  if (workbook) document.getElementById('repeat-sheets-wrap').style.display = m === 'repeat' ? 'block' : 'none';
+}
+
+// ── Drag and drop ─────────────────────────────────────────────
+(function() {
+  const zone = document.getElementById('upload-zone');
+  zone.addEventListener('dragenter', function(e) { e.preventDefault(); e.stopPropagation(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragover',  function(e) { e.preventDefault(); e.stopPropagation(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', function(e) { e.preventDefault(); e.stopPropagation(); zone.classList.remove('drag-over'); });
+  zone.addEventListener('drop', function(e) {
+    e.preventDefault(); e.stopPropagation();
+    zone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    if (!file.name.endsWith('.xlsx')) {
+      alert('Please drop an .xlsx file.'); return;
+    }
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    document.getElementById('hidden-file').files = dt.files;
+    handleFile({ target: { files: dt.files } });
+  });
+})();
+
+// ── File upload ───────────────────────────────────────────────
+function handleFile(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    workbook = XLSX.read(ev.target.result, { type: 'array' });
+    allSheets = workbook.SheetNames;
+    const sel = document.getElementById('main-sheet-select');
+    sel.innerHTML = allSheets.map(s => `<option>${s}</option>`).join('');
+    document.getElementById('sheet-selector').style.display = 'block';
+    document.getElementById('repeat-sheets-wrap').style.display = mode === 'repeat' ? 'block' : 'none';
+    document.getElementById('upload-zone').classList.add('has-file');
+    document.getElementById('upload-label').textContent = file.name + ' — loaded ✓';
+    loadMainSheet();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function loadMainSheet() {
+  if (!workbook) return;
+  const name = document.getElementById('main-sheet-select').value;
+  mainData = XLSX.utils.sheet_to_json(workbook.Sheets[name], { defval: '' });
+  showPreview(mainData);
+  buildMapping();
+  document.getElementById('sec-map').style.display = 'block';
+  document.getElementById('badge-3').classList.add('done');
+  if (document.getElementById('range-to'))     document.getElementById('range-to').value     = mainData.length;
+  if (document.getElementById('range-to-csv')) document.getElementById('range-to-csv').value = mainData.length;
+  refreshSubmitBtn();
+}
+
+function refreshSubmitBtn() {
+  const ready = connVerified && mainData.length > 0;
+  const submitBtn = document.getElementById('submit-btn');
+  const exportBtn = document.getElementById('export-btn');
+  if (submitBtn) submitBtn.disabled = !ready;
+  if (exportBtn) exportBtn.disabled = !mainData.length;
+}
+
+function showPreview(data) {
+  if (!data.length) return;
+  const cols = Object.keys(data[0]);
+  const rows = data.slice(0, 3);
+  let html = '<table><tr>' + cols.map(c => `<th>${escHtml(c)}</th>`).join('') + '</tr>';
+  rows.forEach(r => {
+    html += '<tr>' + cols.map(c => `<td title="${escHtml(String(r[c]))}">${escHtml(String(r[c] ?? ''))}</td>`).join('') + '</tr>';
+  });
+  html += '</table>';
+  document.getElementById('preview-table').innerHTML = html;
+  document.getElementById('preview-wrap').style.display = 'block';
+}
+
+// ── Mapping ───────────────────────────────────────────────────
+function buildMapping() {
+  if (!mainData.length) return;
+  const cols = Object.keys(mainData[0]);
+  const wrap = document.getElementById('map-list');
+
+  // Build kobo options HTML (grouped if fields available)
+  function koboOptionsHtml(colName) {
+    let opts = '';
+    if (koboFields.length > 0) {
+      // Try to auto-match by exact name
+      const exactMatch = koboFields.find(f => f.name === colName);
+      // As-is option (matches exact column name)
+      opts += `<option value="${escHtml(colName)}" ${exactMatch ? 'selected' : ''}>${escHtml(colName)} (as-is)</option>`;
+      opts += `<option value="__skip__">— skip —</option>`;
+      opts += `<optgroup label="── Kobo fields ──">`;
+      koboFields.forEach(f => {
+        const sel = (exactMatch && f.name === colName) ? '' : (f.name === colName ? 'selected' : '');
+        opts += `<option value="${escHtml(f.name)}" ${sel}>${escHtml(f.name)}${f.label !== f.name ? ' — ' + escHtml(f.label) : ''}</option>`;
+      });
+      opts += `</optgroup>`;
+      opts += `<option value="__custom__">Custom name…</option>`;
+    } else {
+      opts += `<option value="${escHtml(colName)}">${escHtml(colName)}</option>`;
+      opts += `<option value="__skip__">— skip —</option>`;
+      opts += `<option value="__custom__">Custom name…</option>`;
+    }
+    return opts;
+  }
+
+  wrap.innerHTML = cols.map(c => {
+    const safe = c.replace(/[^a-zA-Z0-9_]/g, '_');
+    return `<div class="mapping-row-wrap" id="wrap_${safe}">
+      <div class="mapping-grid" id="grid_${safe}">
+        <div class="col-label" title="${escHtml(c)}">${escHtml(c)}</div>
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        <select id="map_${safe}" data-col="${escHtml(c)}">${koboOptionsHtml(c)}</select>
+      </div>
+      <div id="custom_${safe}" class="custom-name-inline">
+        <input type="text" placeholder="Enter Kobo field name…" id="cval_${safe}" />
+      </div>
+    </div>`;
+  }).join('');
+
+  cols.forEach(c => {
+    const safe = c.replace(/[^a-zA-Z0-9_]/g, '_');
+    const sel = document.getElementById('map_' + safe);
+    if (sel) sel.addEventListener('change', function() {
+      const grid = document.getElementById('grid_' + safe);
+      const customDiv = document.getElementById('custom_' + safe);
+      if (this.value === '__custom__') {
+        // Switch to 4-column layout: col-label | arrow | select | custom-input
+        grid.className = 'mapping-grid-custom';
+        customDiv.style.display = 'block';
+        // Move custom input inside the grid row
+        grid.appendChild(customDiv);
+        document.getElementById('cval_' + safe).focus();
+      } else {
+        grid.className = 'mapping-grid';
+        customDiv.style.display = 'none';
+        // Move it back outside grid
+        document.getElementById('wrap_' + safe).appendChild(customDiv);
+      }
+    });
+  });
+}
+
+// ── Repeat groups ─────────────────────────────────────────────
+function addRepeatSheet() {
+  const id = 'rg_' + repeatSheetCount++;
+  const wrap = document.createElement('div');
+  wrap.id = id;
+  wrap.style = 'display:grid;grid-template-columns:1fr 1fr 1fr 28px;gap:8px;align-items:center;margin-bottom:7px';
+  wrap.innerHTML = `<select style="font-size:12px;height:32px;padding:0 7px;border:1px solid #ddd;border-radius:7px;background:#fafaf8">${allSheets.map(s => `<option>${escHtml(s)}</option>`).join('')}</select>
+    <input type="text" placeholder="Kobo group name" style="font-size:12px;height:32px;border:1px solid #ddd;border-radius:7px;padding:0 8px" />
+    <input type="text" placeholder="Join key column" style="font-size:12px;height:32px;border:1px solid #ddd;border-radius:7px;padding:0 8px" />
+    <button class="remove-btn" onclick="this.parentElement.remove()" title="Remove">&#10005;</button>`;
+  document.getElementById('repeat-sheet-list').appendChild(wrap);
+}
+
+// ── Payload builder ───────────────────────────────────────────
+function buildPayload(row) {
+  const cols = Object.keys(row);
+  const submission = {};
+  cols.forEach(c => {
+    const safe = c.replace(/[^a-zA-Z0-9_]/g, '_');
+    const sel = document.getElementById('map_' + safe);
+    if (!sel) return;
+    let fieldName = sel.value;
+    if (fieldName === '__skip__') return;
+    if (fieldName === '__custom__') {
+      const cv = document.getElementById('cval_' + safe);
+      fieldName = cv ? cv.value.trim() : c;
+    }
+    if (fieldName) submission[fieldName] = row[c];
+  });
+  if (mode === 'repeat') {
+    document.querySelectorAll('#repeat-sheet-list > div').forEach(div => {
+      const inputs = div.querySelectorAll('select, input');
+      if (inputs.length < 3) return;
+      const sheetName = inputs[0].value;
+      const groupKey = inputs[1].value.trim();
+      const joinCol = inputs[2].value.trim();
+      if (!groupKey || !sheetName) return;
+      const ws = workbook.Sheets[sheetName];
+      if (!ws) return;
+      const repeatData = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      const parentId = row[joinCol] || row[Object.keys(row)[0]];
+      submission[groupKey] = repeatData
+        .filter(r => r[joinCol] == parentId)
+        .map(r => { const obj = {}; Object.keys(r).forEach(k => { if (k !== joinCol) obj[k] = r[k]; }); return obj; });
+    });
+  }
+  return submission;
+}
+
+// ── Submit mode toggle ────────────────────────────────────────
+function setSubmitMode(m) {
+  document.getElementById('btn-mode-csv').classList.toggle('active', m === 'csv');
+  document.getElementById('btn-mode-api').classList.toggle('active', m === 'api');
+  document.getElementById('mode-csv').style.display = m === 'csv' ? 'block' : 'none';
+  document.getElementById('mode-api').style.display = m === 'api' ? 'block' : 'none';
+}
+
+document.getElementById('row-range-csv').addEventListener('change', function() {
+  document.getElementById('range-inputs-csv').style.display = this.value === 'range' ? 'block' : 'none';
+});
+
+// ── ZIP Export (ODK XML instances for bulk-submission-form) ──
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
+function escXml(s) {
+  return String(s ?? '')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&apos;')
+    // Remove control characters that are invalid in XML 1.0
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+}
+
+function sanitizeTagName(name) {
+  // Keep group/field structure intact -- sanitize each part individually
+  return String(name).split('/').map(part =>
+    part.replace(/[^a-zA-Z0-9_\-\.]/g, '_').replace(/^([^a-zA-Z_])/, '_$1')
+  ).join('/');
+}
+
+function excelDateToISO(serial) {
+  // Excel date serial: days since 1900-01-01 (with Lotus 1-2-3 leap year bug)
+  const utcDays  = Math.floor(serial) - 25569;
+  const utcMs    = utcDays * 86400 * 1000;
+  const d        = new Date(utcMs);
+  if (isNaN(d)) return String(serial);
+  const yyyy = d.getUTCFullYear();
+  const mm   = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const dd   = String(d.getUTCDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function isExcelDateSerial(value) {
+  return typeof value === 'number' && Number.isInteger(value) && value > 1000 && value < 60000;
+}
+
+function payloadToXml(obj) {
+  // Build a nested tree first so that fields sharing the same group
+  // (e.g. school/cycleCode and school/schoolName) are wrapped in a
+  // SINGLE <school> tag, not separate duplicate group tags.
+  function buildTree(flatObj) {
+    const tree = {};
+    Object.entries(flatObj).forEach(([k, v]) => {
+      const parts = sanitizeTagName(k).split('/');
+      let node = tree;
+      parts.forEach((part, i) => {
+        if (i === parts.length - 1) {
+          node[part] = v;  // leaf value
+        } else {
+          if (!node[part] || typeof node[part] !== 'object' || Array.isArray(node[part])) {
+            node[part] = {};
+          }
+          node = node[part];
+        }
+      });
+    });
+    return tree;
+  }
+
+  function serializeTree(tree) {
+    return Object.entries(tree).map(([tag, v]) => {
+      if (Array.isArray(v)) {
+        // Repeat group
+        return v.map(item => `<${tag}>${serializeTree(buildTree(item))}</${tag}>`).join('');
+      }
+      if (v !== null && typeof v === 'object') {
+        return `<${tag}>${serializeTree(v)}</${tag}>`;
+      }
+      const val = escXml(isExcelDateSerial(v) ? excelDateToISO(v) : String(v ?? ''));
+      return `<${tag}>${val}</${tag}>`;
+    }).join('');
+  }
+
+  return serializeTree(buildTree(obj));
+}
+
+async function exportZip() {
+  if (!mainData.length) { alert('Please upload a file first.'); return; }
+  const username = document.getElementById('kobo-username').value.trim();
+  if (!username) { alert('Please enter your KoboToolbox username.'); return; }
+
+  let rows = mainData;
+  if (document.getElementById('row-range-csv').value === 'range') {
+    const from = Math.max(0, parseInt(document.getElementById('range-from-csv').value) - 1) || 0;
+    const to   = parseInt(document.getElementById('range-to-csv').value) || rows.length;
+    rows = rows.slice(from, to);
+  }
+
+  const idString  = koboIdString || document.getElementById('form-uid').value.trim();
+  const rootTag   = sanitizeTagName(idString);
+  const formUuid  = koboFormUuid || '';
+  const versionAttr = koboVersion ? ` version="${escXml(koboVersion)}"` : '';
+  const nowISO = new Date().toISOString().replace('Z', '+00:00');
+
+  // System fields managed by the tool — strip from payload to avoid duplication
+  const systemFields = ['start','end','username','__version__','_version_',
+    'meta/rootUuid','meta/instanceID','formhub/uuid','_id','_uuid',
+    '_submission_time','_validation_status','_notes','_status',
+    '_submitted_by','_tags','_index'];
+
+  // Build one XML instance per row
+  const xmlInstances = rows.map((row, i) => {
+    const payload = buildPayload(row);
+    systemFields.forEach(k => delete payload[k]);
+    const instanceUUID = generateUUID();
+    const rootUUID     = generateUUID(); // meta/rootUuid — needed for Enketo edit
+
+    const xml =
+      `<?xml version="1.0" ?>` +
+      `<${rootTag} xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="${escXml(idString)}"${versionAttr}>` +
+      `<formhub><uuid>${escXml(formUuid)}</uuid></formhub>` +
+      `<start>${nowISO}</start>` +
+      `<end>${nowISO}</end>` +
+      `<username/>` +
+      payloadToXml(payload) +
+      (koboVersion ? `<__version__>${escXml(koboVersion)}</__version__>` : '') +
+      `<meta>` +
+        `<instanceID>${instanceUUID}</instanceID>` +
+        `<rootUuid>${rootUUID}</rootUuid>` +
+      `</meta>` +
+      `</${rootTag}>`;
+    if (i === 0) {
+      console.log('[KoboZip] id_string:', idString, '| rootTag:', rootTag, '| formUuid:', formUuid, '| version:', koboVersion);
+      console.log('[KoboZip] First XML instance:', xml);
+    }
+    return { name: `submission_${String(i+1).padStart(4,'0')}_${instanceUUID}.xml`, xml };
+  });
+
+  // Build ZIP using JSZip
+  const zip = new JSZip();
+  const instancesFolder = zip.folder('instances');
+  xmlInstances.forEach(({ name, xml }) => {
+    const folder = instancesFolder.folder(name.replace('.xml',''));
+    folder.file(name, xml);
+  });
+
+  const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `kobo_bulk_${idString}_${rows.length}rows.zip`;
+  a.click();
+
+  const uploadUrl = `https://kc-eu.kobotoolbox.org/${username}/bulk-submission-form`;
+  document.getElementById('csv-export-done').style.display = 'block';
+  document.getElementById('zip-done-msg').innerHTML =
+    `&#10003; <strong>ZIP exported (${rows.length} submissions).</strong><br><br>` +
+    `Now upload it at:<br>` +
+    `<a href="${uploadUrl}" target="_blank" rel="noopener" style="color:#0F6E56;font-weight:600;word-break:break-all">${uploadUrl}</a><br><br>` +
+    `<span style="font-size:12px">Log in to KoboToolbox first, then open that link and upload the ZIP file.</span>`;
+
+  // Show Results section with export summary
+  const resultsEl = document.getElementById('sec-results');
+  resultsEl.style.display = 'block';
+  document.getElementById('log-wrap').innerHTML = '';
+  updateStats(rows.length, rows.length, 0, rows.length);
+  document.getElementById('prog-bar').style.width = '100%';
+  rows.forEach((_, i) => addLog(i + 1, 'ok', 'Included in ZIP export'));
+  resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── Submission ────────────────────────────────────────────────
+let workingEndpoint = null;
+
+async function submitOne(row, token, serverUrl, formUid) {
+  const payload = buildPayload(row);
+  console.log('[KoboSubmit] Payload:', payload);
+  console.log('[KoboSubmit] id_string:', koboIdString, '| version:', koboVersion);
+
+  // If the server URL is our Cloudflare Worker proxy, use its
+  // server-side /submit/ endpoint — bypasses browser permission
+  // restrictions by making the request from Cloudflare's servers.
+  const isWorkerProxy = serverUrl.includes('workers.dev') ||
+                        serverUrl.includes('worker') ||
+                        serverUrl.includes('localhost');
+
+  if (isWorkerProxy) {
+    const submitUrl = serverUrl.replace(/\/$/, '') + '/submit/';
+    const resp = await fetch(submitUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token,
+        formUid,
+        idString:  koboIdString || formUid,
+        version:   koboVersion  || '',
+        formUuid:  koboFormUuid || '',
+        data:      payload,
+      })
+    });
+    const result = await resp.json().catch(() => ({}));
+    if (resp.status === 201) return resp;
+    if (resp.status === 401) throw new Error('Invalid or expired API token');
+    if (resp.status === 403) throw new Error(`Kobo permission denied: ${result.error || ''}`);
+    // Surface the full attempts log for diagnosis
+    const attemptsLog = result.attempts
+      ? result.attempts.map(a => `${a.status} → ${a.endpoint}: ${a.detail}`).join(' | ')
+      : '';
+    throw new Error(result.error + (attemptsLog ? ` | Attempts: ${attemptsLog}` : '') || `Status ${resp.status}`);
+  }
+
+  // Fallback for direct Kobo URL (no proxy) — ODK XML multipart
+  function toXml(obj) {
+    return Object.entries(obj).map(([k, v]) => {
+      if (Array.isArray(v)) return v.map(item => `<${k}>${toXml(item)}</${k}>`).join('');
+      const val = isExcelDateSerial(v) ? excelDateToISO(v) : String(v ?? '');
+      return `<${k}>${escHtml(val)}</${k}>`;
+    }).join('');
+  }
+  const idString   = koboIdString || formUid;
+  const versionAttr = koboVersion ? ` version="${koboVersion}"` : '';
+  const xml = `<?xml version="1.0" encoding="UTF-8"?><${idString} id="${idString}"${versionAttr}>${toXml(payload)}</${idString}>`;
+
+  function makeFormData() {
+    const fd = new FormData();
+    fd.append('xml_submission_file', new Blob([xml], { type: 'text/xml' }), 'submission.xml');
+    return fd;
+  }
+
+  const endpoints = workingEndpoint
+    ? [[workingEndpoint.url, workingEndpoint.method, workingEndpoint.format]]
+    : [
+        [`${serverUrl}/api/v2/assets/${formUid}/data/`,        'POST', 'xml'],
+        [`${serverUrl}/api/v1/submissions/`,                   'POST', 'xml'],
+        [`${serverUrl}/api/v2/assets/${formUid}/submissions/`, 'POST', 'xml'],
+      ];
+
+  let lastMsg = '';
+  for (const [url, method, fmt] of endpoints) {
+    let resp;
+    try {
+      resp = await fetch(url, {
+        method,
+        headers: { 'Authorization': 'Token ' + token },
+        body: makeFormData()
+      });
+    } catch(e) { lastMsg = e.message; continue; }
+
+    if (resp.status === 404 || resp.status === 405) { lastMsg = `${resp.status} at ${url}`; continue; }
+    if (resp.status === 403) {
+      let d = ''; try { const j = await resp.json(); d = j.detail || JSON.stringify(j); } catch(e) {}
+      lastMsg = `403 at ${url}: ${d}`; continue;
+    }
+    if (resp.status === 401) throw new Error('Invalid or expired API token');
+    if ([200, 201, 202, 204].includes(resp.status)) {
+      workingEndpoint = { url, method, format: fmt }; return resp;
+    }
+    let m = ''; try { const j = await resp.json(); m = j.detail || JSON.stringify(j); } catch(e) { m = resp.statusText; }
+    throw new Error(m);
+  }
+  throw new Error(`All submission endpoints failed. Last: ${lastMsg}`);
+}
+
+let running = false, paused = false, cancelled = false;
+
+function togglePause() {
+  paused = !paused;
+  const btn = document.getElementById('pause-btn');
+  if (paused) {
+    btn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg> Resume';
+    btn.style.background = '#E1F5EE'; btn.style.color = '#0F6E56'; btn.style.borderColor = '#1D9E75';
+    addLog('—', 'pend', 'Paused by user');
+  } else {
+    btn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Pause';
+    btn.style.background = '#FAEEDA'; btn.style.color = '#854F0B'; btn.style.borderColor = '#BA7517';
+    addLog('—', 'pend', 'Resumed');
+  }
+}
+
+function cancelSubmission() {
+  if (!confirm('Cancel the submission? Rows already submitted will not be undone.')) return;
+  cancelled = true; running = false; paused = false;
+  document.getElementById('ctrl-row').style.display = 'none';
+  document.getElementById('submit-btn').disabled = false;
+  document.getElementById('submit-btn').innerHTML = '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Start submission';
+  addLog('—', 'err', 'Cancelled by user');
+}
+
+async function startSubmission() {
+  const token = document.getElementById('api-token').value.trim();
+  const formUid = document.getElementById('form-uid').value.trim();
+  if (!token || !formUid || !mainData.length) {
+    alert('Please complete connection test and upload a file first.');
+    return;
+  }
+  const serverUrl = getServerUrl();
+  const delay = parseInt(document.getElementById('delay-slider').value) || 300;
+  let rows = mainData;
+  if (document.getElementById('row-range').value === 'range') {
+    const from = Math.max(0, parseInt(document.getElementById('range-from').value) - 1) || 0;
+    const to = parseInt(document.getElementById('range-to').value) || rows.length;
+    rows = rows.slice(from, to);
+  }
+  logEntries = []; failedRows = [];
+  paused = false; cancelled = false;
+  workingEndpoint = null;
+  document.getElementById('sec-results').style.display = 'block';
+  document.getElementById('log-wrap').innerHTML = '';
+  document.getElementById('retry-btn').style.display = 'none';
+  updateStats(0, 0, 0, rows.length);
+  running = true;
+  document.getElementById('submit-btn').disabled = true;
+  document.getElementById('submit-btn').innerHTML = '&#9654; Submitting…';
+  document.getElementById('ctrl-row').style.display = 'flex';
+  // Reset pause button appearance
+  const pauseBtn = document.getElementById('pause-btn');
+  pauseBtn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Pause';
+  pauseBtn.style.cssText = '';
+  let ok = 0, err = 0;
+  for (let i = 0; i < rows.length; i++) {
+    if (cancelled) break;
+    // Wait while paused
+    while (paused && !cancelled) await sleep(200);
+    if (cancelled) break;
+    try {
+      await submitOne(rows[i], token, serverUrl, formUid);
+      ok++;
+      addLog(i + 1, 'ok', 'Submitted successfully');
+      logEntries.push({ row: i + 1, status: 'ok', message: 'Submitted' });
+    } catch(e) {
+      err++;
+      addLog(i + 1, 'err', e.message);
+      logEntries.push({ row: i + 1, status: 'error', message: e.message });
+      failedRows.push(rows[i]);
+    }
+    updateStats(i + 1, ok, err, rows.length);
+    if (i < rows.length - 1 && !cancelled) await sleep(delay);
+  }
+  running = false;
+  document.getElementById('ctrl-row').style.display = 'none';
+  document.getElementById('submit-btn').disabled = false;
+  document.getElementById('submit-btn').innerHTML = cancelled
+    ? '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Start submission'
+    : '&#10003; Done — click to resubmit';
+  if (failedRows.length > 0) document.getElementById('retry-btn').style.display = 'flex';
+  document.getElementById('sec-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function addLog(row, status, msg) {
+  const wrap = document.getElementById('log-wrap');
+  const div = document.createElement('div');
+  div.className = 'log-row';
+  const badgeClass = status === 'ok' ? 'ok' : status === 'err' ? 'err' : 'pend';
+  const badgeLabel = status === 'ok' ? 'OK' : status === 'err' ? 'FAIL' : '—';
+  div.innerHTML = `<span class="idx">#${row}</span><span class="msg">${escHtml(msg)}</span><span class="badge ${badgeClass}">${badgeLabel}</span>`;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+function updateStats(done, ok, err, total) {
+  document.getElementById('st-total').textContent = total;
+  document.getElementById('st-ok').textContent = ok;
+  document.getElementById('st-err').textContent = err;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  document.getElementById('st-pct').textContent = pct + '%';
+  document.getElementById('prog-bar').style.width = pct + '%';
+}
+
+async function retryFailed() {
+  if (!failedRows.length) return;
+  const token = document.getElementById('api-token').value.trim();
+  const formUid = document.getElementById('form-uid').value.trim();
+  const serverUrl = getServerUrl();
+  const delay = parseInt(document.getElementById('delay-slider').value) || 300;
+  const rows = [...failedRows]; failedRows = [];
+  document.getElementById('retry-btn').style.display = 'none';
+  for (let i = 0; i < rows.length; i++) {
+    try {
+      await submitOne(rows[i], token, serverUrl, formUid);
+      addLog('R' + (i + 1), 'ok', 'Retry OK');
+    } catch(e) {
+      addLog('R' + (i + 1), 'err', 'Retry failed: ' + e.message);
+      failedRows.push(rows[i]);
+    }
+    if (i < rows.length - 1) await sleep(delay);
+  }
+  if (failedRows.length > 0) document.getElementById('retry-btn').style.display = 'flex';
+}
+
+function downloadLog() {
+  const csv = ['Row,Status,Message', ...logEntries.map(e => `${e.row},${e.status},"${e.message.replace(/"/g, '""')}"`)].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'kobo_submission_log.csv';
+  a.click();
+}
+</script>
+
+
+<script>
+// ── Operation selector ────────────────────────────────────────
+let currentOp = null;
+
+function setOperation(op) {
+  currentOp = op;
+  document.getElementById('op-submit').classList.toggle('active', op === 'submit');
+  document.getElementById('op-edit').classList.toggle('active', op === 'edit');
+  document.getElementById('badge-1').classList.add('done');
+
+  // Show/hide sections based on operation
+  document.getElementById('steps-container').style.display = 'block';
+  document.getElementById('sec-survey-mode').style.display = op === 'submit' ? 'block' : 'none';
+  document.getElementById('action-submit').style.display   = op === 'submit' ? 'block' : 'none';
+  document.getElementById('action-edit').style.display     = op === 'edit'   ? 'block' : 'none';
+  document.getElementById('edit-upload-hint').style.display= op === 'edit'   ? 'block' : 'none';
+
+  // Step numbering — survey mode skipped for edit (steps shift)
+  document.getElementById('badge-upload').textContent = op === 'submit' ? '5' : '4';
+  document.getElementById('badge-map').textContent    = op === 'submit' ? '6' : '5';
+
+  // Setup guide content
+  document.getElementById('guide-submit').style.display = op === 'submit' ? 'block' : 'none';
+  document.getElementById('guide-edit').style.display   = op === 'edit'   ? 'block' : 'none';
+  document.getElementById('guide-title').textContent    = op === 'submit'
+    ? 'Setup guide — ZIP needs no setup, Cloudflare Worker only for API tab'
+    : 'Setup guide — Cloudflare Worker required for edit operations';
+  document.getElementById('guide-intro').textContent = op === 'submit'
+    ? 'The ZIP export works from any browser with no setup. The Cloudflare Worker is only needed for the Edit Existing Records operation.'
+    : 'Edit operations call the KoboToolbox API directly from your browser. A Cloudflare Worker proxy is required to relay these requests.';
+
+  // Action title
+  document.getElementById('action-title').textContent = op === 'submit' ? 'Export / Submit' : 'Apply edits';
+
+  // Reset edit button state if file loaded
+  refreshSubmitBtn();
+
+  // Scroll to guide
+  document.getElementById('steps-container').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── Edit row range ────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('row-range-edit').addEventListener('change', function() {
+    document.getElementById('range-inputs-edit').style.display = this.value === 'range' ? 'block' : 'none';
+  });
+});
+
+// ── Bulk Edit via PATCH /data/bulk/ ───────────────────────────
+let editRunning = false, editPaused = false, editCancelled = false;
+
+function togglePauseEdit() {
+  editPaused = !editPaused;
+  const btn = document.getElementById('pause-btn-edit');
+  if (editPaused) {
+    btn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg> Resume';
+    btn.style.cssText = 'background:#E1F5EE;color:#0F6E56;border-color:#1D9E75;';
+  } else {
+    btn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Pause';
+    btn.style.cssText = '';
+  }
+}
+
+function cancelEdits() {
+  if (!confirm('Cancel editing? Changes already applied will not be undone.')) return;
+  editCancelled = true; editRunning = false; editPaused = false;
+  document.getElementById('ctrl-row-edit').style.display = 'none';
+  document.getElementById('edit-btn').disabled = false;
+  document.getElementById('edit-btn').innerHTML = '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Apply edits';
+  addLog('—', 'pend', 'Cancelled by user');
+}
+
+async function startEdits() {
+  const token   = document.getElementById('api-token').value.trim();
+  const formUid = document.getElementById('form-uid').value.trim();
+  const serverUrl = getServerUrl();
+  if (!token || !formUid || !mainData.length) {
+    alert('Please complete connection test and upload a file first.'); return;
+  }
+
+  // Find _id column
+  const cols = Object.keys(mainData[0]);
+  const idCol = cols.find(c => c === '_id' || c.toLowerCase() === '_id');
+  if (!idCol) { alert('No _id column found. Export your data from KoboToolbox first to obtain submission IDs.'); return; }
+
+  // Get field columns (all except _id and system fields)
+  const systemCols = ['_id','_uuid','_submission_time','_validation_status','_notes',
+    '_status','_submitted_by','_tags','_index','start','end','username','__version__','meta/rootUuid'];
+  const fieldCols = cols.filter(c => c !== idCol && !systemCols.includes(c));
+
+  // Apply column mapping
+  const mappedFields = fieldCols.map(c => {
+    const safe = c.replace(/[^a-zA-Z0-9_]/g,'_');
+    const sel  = document.getElementById('map_'+safe);
+    if (!sel || sel.value === '__skip__') return null;
+    let fieldName = sel.value;
+    if (fieldName === '__custom__') {
+      const cv = document.getElementById('cval_'+safe); fieldName = cv ? cv.value.trim() : c;
+    }
+    return { col: c, field: fieldName };
+  }).filter(Boolean);
+
+  if (!mappedFields.length) { alert('No fields mapped for editing.'); return; }
+
+  let rows = mainData;
+  if (document.getElementById('row-range-edit').value === 'range') {
+    const from = Math.max(0, parseInt(document.getElementById('range-from-edit').value)-1)||0;
+    const to   = parseInt(document.getElementById('range-to-edit').value)||rows.length;
+    rows = rows.slice(from, to);
+  }
+
+  const delay = parseInt(document.getElementById('delay-slider-edit').value)||300;
+  logEntries = []; failedRows = []; editCancelled = false; editPaused = false;
+  editRunning = true;
+  document.getElementById('sec-results').style.display = 'block';
+  document.getElementById('log-wrap').innerHTML = '';
+  document.getElementById('retry-btn').style.display = 'none';
+  updateStats(0, 0, 0, mappedFields.length);
+  document.getElementById('edit-btn').disabled = true;
+  document.getElementById('edit-btn').innerHTML = '&#9654; Applying edits…';
+  document.getElementById('ctrl-row-edit').style.display = 'flex';
+
+  const url = `${serverUrl}/api/v2/assets/${formUid}/data/bulk/`;
+  let ok = 0, err = 0;
+
+  // One PATCH per field — each updates all submission IDs at once
+  for (let fi = 0; fi < mappedFields.length; fi++) {
+    if (editCancelled) break;
+    while (editPaused && !editCancelled) await sleep(200);
+    if (editCancelled) break;
+
+    const { col, field } = mappedFields[fi];
+    // Collect submission IDs and their new values grouped by value
+    // (bulk endpoint accepts one value per call — group rows by same value)
+    const valueGroups = {};
+    rows.forEach(row => {
+      const id  = row[idCol];
+      const val = isExcelDateSerial(row[col]) ? excelDateToISO(row[col]) : String(row[col] ?? '');
+      if (!id) return;
+      if (!valueGroups[val]) valueGroups[val] = [];
+      valueGroups[val].push(Number(id));
+    });
+
+    let fieldOk = true;
+    for (const [val, ids] of Object.entries(valueGroups)) {
+      if (editCancelled) break;
+      try {
+        const resp = await fetch(url, {
+          method: 'PATCH',
+          headers: { 'Authorization': 'Token '+token, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ payload: { submission_ids: ids, data: { [field]: val } } })
+        });
+        if (!resp.ok) {
+          const j = await resp.json().catch(() => ({}));
+          throw new Error(j.detail || resp.status+' '+resp.statusText);
+        }
+      } catch(e) { fieldOk = false; err++; addLog(fi+1,'err',`${field}: ${e.message}`); logEntries.push({row:fi+1,status:'error',message:`${field}: ${e.message}`}); break; }
+    }
+    if (fieldOk) { ok++; addLog(fi+1,'ok',`${field} — ${rows.length} row(s) updated`); logEntries.push({row:fi+1,status:'ok',message:`${field} updated`}); }
+    updateStats(fi+1, ok, err, mappedFields.length);
+    if (fi < mappedFields.length-1 && !editCancelled) await sleep(delay);
+  }
+
+  editRunning = false;
+  document.getElementById('ctrl-row-edit').style.display = 'none';
+  document.getElementById('edit-btn').disabled = false;
+  document.getElementById('edit-btn').innerHTML = '&#10003; Done — click to re-apply';
+  document.getElementById('sec-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Override refreshSubmitBtn to also handle edit button
+const _origRefresh = typeof refreshSubmitBtn === 'function' ? refreshSubmitBtn : () => {};
+function refreshSubmitBtn() {
+  const ready    = connVerified && mainData.length > 0;
+  const submitEl = document.getElementById('submit-btn');
+  const exportEl = document.getElementById('export-btn');
+  const editEl   = document.getElementById('edit-btn');
+  if (submitEl) submitEl.disabled = !ready;
+  if (exportEl) exportEl.disabled = !mainData.length;
+  if (editEl)   editEl.disabled   = !ready;
+}
+</script>
+
+</body>
+</html>
