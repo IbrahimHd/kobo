@@ -1,0 +1,7 @@
+For New Submissions:
+Use this tool to prepare the XML packages, then upload them to:
+https://kc-eu.kobotoolbox.org/scr_im/bulk-submission-form
+
+Worker is already deployed on CloudFlare
+In this Tool, choose Custom URL and provide the following URL:
+https://kobo.hammadibrahim.workers.dev
