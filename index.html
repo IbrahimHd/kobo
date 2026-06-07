@@ -320,6 +320,7 @@
       <div id="preview-wrap">
         <p style="font-size:12px;color:#888;margin-bottom:.5rem">Preview — first 3 rows:</p>
         <div class="preview-table-wrap" id="preview-table"></div>
+        <p id="record-count" style="font-size:12px;color:#1D9E75;font-weight:600;margin-top:.5rem"></p>
       </div>
     </div>
 
@@ -412,7 +413,7 @@
       </div>
       <div class="stats-row">
         <div class="stat"><div class="val" id="st-total">0</div><div class="lbl">Total</div></div>
-        <div class="stat"><div class="val" id="st-ok" style="color:#1D9E75">0</div><div class="lbl">OK</div></div>
+        <div class="stat"><div class="val" id="st-ok" style="color:#1D9E75">0</div><div class="lbl">Successful</div></div>
         <div class="stat"><div class="val" id="st-err" style="color:#E24B4A">0</div><div class="lbl">Failed</div></div>
         <div class="stat"><div class="val" id="st-pct">0%</div><div class="lbl">Progress</div></div>
       </div>
@@ -433,6 +434,10 @@
   </div><!-- /steps-container -->
 
 </div><!-- /container -->
+
+<footer style="text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:#bbb">
+  Brought to you by <a href="mailto:hammadibrahim@hotmail.com" style="color:#888;font-weight:600;text-decoration:none;border-bottom:1px dotted #bbb">Ibrahim Hammad</a>
+</footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -477,9 +482,6 @@ function onServerChange() {
   document.getElementById('custom-url-row').style.display =
     document.getElementById('server-url').value === 'custom' ? 'flex' : 'none';
 }
-document.getElementById('row-range').addEventListener('change', function() {
-  document.getElementById('range-inputs').style.display = this.value === 'range' ? 'block' : 'none';
-});
 
 function getServerUrl() {
   const val = document.getElementById('server-url').value;
@@ -724,26 +726,38 @@ function setMode(m) {
   if (workbook) document.getElementById('repeat-sheets-wrap').style.display = m === 'repeat' ? 'block' : 'none';
 }
 
-// ── Drag and drop ─────────────────────────────────────────────
-(function() {
+// ── Drag and drop — initialized after steps-container is shown ─
+function initDragDrop() {
   const zone = document.getElementById('upload-zone');
-  zone.addEventListener('dragenter', function(e) { e.preventDefault(); e.stopPropagation(); zone.classList.add('drag-over'); });
-  zone.addEventListener('dragover',  function(e) { e.preventDefault(); e.stopPropagation(); zone.classList.add('drag-over'); });
-  zone.addEventListener('dragleave', function(e) { e.preventDefault(); e.stopPropagation(); zone.classList.remove('drag-over'); });
+  if (!zone || zone._dragInitialized) return;
+  zone._dragInitialized = true;
+
+  zone.addEventListener('dragenter', function(e) {
+    e.preventDefault(); e.stopPropagation();
+    zone.classList.add('drag-over');
+  });
+  zone.addEventListener('dragover', function(e) {
+    e.preventDefault(); e.stopPropagation();
+    zone.classList.add('drag-over');
+  });
+  zone.addEventListener('dragleave', function(e) {
+    e.preventDefault(); e.stopPropagation();
+    if (!zone.contains(e.relatedTarget)) {
+      zone.classList.remove('drag-over');
+    }
+  });
   zone.addEventListener('drop', function(e) {
     e.preventDefault(); e.stopPropagation();
     zone.classList.remove('drag-over');
     const file = e.dataTransfer.files[0];
     if (!file) return;
-    if (!file.name.endsWith('.xlsx')) {
-      alert('Please drop an .xlsx file.'); return;
-    }
+    if (!file.name.endsWith('.xlsx')) { alert('Please drop an .xlsx file.'); return; }
     const dt = new DataTransfer();
     dt.items.add(file);
     document.getElementById('hidden-file').files = dt.files;
     handleFile({ target: { files: dt.files } });
   });
-})();
+}
 
 // ── File upload ───────────────────────────────────────────────
 function handleFile(e) {
@@ -770,9 +784,26 @@ function loadMainSheet() {
   showPreview(mainData);
   buildMapping();
   document.getElementById('sec-map').style.display = 'block';
-  document.getElementById('badge-3').classList.add('done');
-  if (document.getElementById('range-to'))     document.getElementById('range-to').value     = mainData.length;
-  if (document.getElementById('range-to-csv')) document.getElementById('range-to-csv').value = mainData.length;
+
+  // Update all "To row" inputs with actual row count
+  const count = mainData.length;
+  ['range-to','range-to-csv','range-to-edit'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = count;
+  });
+  // Reset all range dropdowns to "All rows" and hide range inputs
+  ['row-range','row-range-csv','row-range-edit'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = 'all';
+  });
+  ['range-inputs','range-inputs-csv','range-inputs-edit'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  // Show record count
+  const countEl = document.getElementById('record-count');
+  if (countEl) countEl.textContent = count + ' record' + (count !== 1 ? 's' : '') + ' found';
+
   refreshSubmitBtn();
 }
 
@@ -921,8 +952,20 @@ function setSubmitMode(m) {
   document.getElementById('mode-api').style.display = m === 'api' ? 'block' : 'none';
 }
 
-document.getElementById('row-range-csv').addEventListener('change', function() {
-  document.getElementById('range-inputs-csv').style.display = this.value === 'range' ? 'block' : 'none';
+// ── Row range listeners (delegated — elements may be hidden at load time) ─
+document.addEventListener('change', function(e) {
+  if (e.target.id === 'row-range-csv') {
+    document.getElementById('range-inputs-csv').style.display = e.target.value === 'range' ? 'block' : 'none';
+    document.getElementById('range-to-csv').value = mainData.length || 1;
+  }
+  if (e.target.id === 'row-range') {
+    document.getElementById('range-inputs').style.display = e.target.value === 'range' ? 'block' : 'none';
+    document.getElementById('range-to').value = mainData.length || 1;
+  }
+  if (e.target.id === 'row-range-edit') {
+    document.getElementById('range-inputs-edit').style.display = e.target.value === 'range' ? 'block' : 'none';
+    document.getElementById('range-to-edit').value = mainData.length || 1;
+  }
 });
 
 // ── ZIP Export (ODK XML instances for bulk-submission-form) ──
@@ -1334,6 +1377,7 @@ function setOperation(op) {
 
   // Show/hide sections based on operation
   document.getElementById('steps-container').style.display = 'block';
+  initDragDrop(); // safe to init now — container is visible
   document.getElementById('sec-survey-mode').style.display = op === 'submit' ? 'block' : 'none';
   document.getElementById('action-submit').style.display   = op === 'submit' ? 'block' : 'none';
   document.getElementById('action-edit').style.display     = op === 'edit'   ? 'block' : 'none';
@@ -1365,9 +1409,6 @@ function setOperation(op) {
 
 // ── Edit row range ────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('row-range-edit').addEventListener('change', function() {
-    document.getElementById('range-inputs-edit').style.display = this.value === 'range' ? 'block' : 'none';
-  });
 });
 
 // ── Bulk Edit via PATCH /data/bulk/ ───────────────────────────
@@ -1492,16 +1533,16 @@ async function startEdits() {
   document.getElementById('sec-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-// Override refreshSubmitBtn to also handle edit button
-const _origRefresh = typeof refreshSubmitBtn === 'function' ? refreshSubmitBtn : () => {};
+// ── Button state refresh ──────────────────────────────────────
 function refreshSubmitBtn() {
-  const ready    = connVerified && mainData.length > 0;
+  const hasData  = mainData.length > 0;
+  const hasConn  = connVerified;
   const submitEl = document.getElementById('submit-btn');
   const exportEl = document.getElementById('export-btn');
   const editEl   = document.getElementById('edit-btn');
-  if (submitEl) submitEl.disabled = !ready;
-  if (exportEl) exportEl.disabled = !mainData.length;
-  if (editEl)   editEl.disabled   = !ready;
+  if (submitEl) submitEl.disabled = !(hasConn && hasData);
+  if (exportEl) exportEl.disabled = !hasData;
+  if (editEl)   editEl.disabled   = !(hasConn && hasData);
 }
 </script>
 
