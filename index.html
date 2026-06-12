@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>KoboToolbox Data Tool</title>
+<title>KoboToolbox Management Tool</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f3; color: #1a1a1a; min-height: 100vh; padding: 2rem 15%; }
@@ -154,9 +154,9 @@
   <header>
     <h1>
       <svg width="22" height="22" fill="none" stroke="#185FA5" stroke-width="2" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
-      KoboToolbox Data Tool
+      KoboToolbox Management Tool
     </h1>
-    <p>Bulk submission and editing of KoboToolbox records — runs entirely in your browser</p>
+    <p>Bulk submissions, making edits of records, and managing permissions — runs entirely in your browser</p>
   </header>
 
   <!-- Step 1: Operation selector -->
@@ -357,7 +357,7 @@
 
     <!-- Step 7: Action -->
     <div class="card">
-      <div class="card-title"><span class="step-badge">7</span> <span id="action-title">Action</span></div>
+      <div class="card-title"><span class="step-badge" id="badge-action">7</span> <span id="action-title">Action</span></div>
 
       <!-- Submission action -->
       <div id="action-submit">
@@ -1465,9 +1465,22 @@ function setOperation(op) {
   // Column mapping section: full grid for submit/edit, hidden+replaced for perms
   document.getElementById('sec-map').style.display = op === 'perms' ? 'none' : 'block';
 
-  // Step numbering — survey mode skipped for edit/perms (steps shift)
-  document.getElementById('badge-upload').textContent = op === 'submit' ? '5' : '4';
-  document.getElementById('badge-map').textContent    = op === 'submit' ? '6' : '5';
+  // Step numbering — sections shift depending on operation:
+  //   submit: 1=op, 2=guide/conn(3), 4=survey, 5=upload, 6=map, 7=action
+  //   edit:   1=op, 3=conn, 4=upload, 5=map, 6=action
+  //   perms:  1=op, 3=conn, 4=upload, 5=action (mapping hidden)
+  if (op === 'submit') {
+    document.getElementById('badge-upload').textContent = '5';
+    document.getElementById('badge-map').textContent    = '6';
+    document.getElementById('badge-action').textContent = '7';
+  } else if (op === 'edit') {
+    document.getElementById('badge-upload').textContent = '4';
+    document.getElementById('badge-map').textContent    = '5';
+    document.getElementById('badge-action').textContent = '6';
+  } else { // perms
+    document.getElementById('badge-upload').textContent = '4';
+    document.getElementById('badge-action').textContent = '5';
+  }
 
   // Setup guide content
   document.getElementById('guide-submit').style.display = op === 'submit' ? 'block' : 'none';
