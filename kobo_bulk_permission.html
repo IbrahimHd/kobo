@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kobo Bulk Permissions Tool</title>
+
+<style>
+body{
+    font-family: Arial, sans-serif;
+    max-width: 900px;
+    margin: 30px auto;
+    padding: 20px;
+}
+label{
+    display:block;
+    margin-top:12px;
+    font-weight:bold;
+}
+input, select, textarea{
+    width:100%;
+    padding:8px;
+    box-sizing:border-box;
+}
+button{
+    margin-top:15px;
+    padding:10px 20px;
+    cursor:pointer;
+}
+#log{
+    margin-top:20px;
+    padding:10px;
+    border:1px solid #ccc;
+    min-height:150px;
+    white-space:pre-wrap;
+    background:#fafafa;
+}
+</style>
+</head>
+<body>
+
+<h2>KoboToolbox Bulk User Permissions</h2>
+
+<label>Server URL</label>
+<input
+    id="server"
+    value="https://eu.kobotoolbox.org"
+    placeholder="https://eu.kobotoolbox.org">
+
+<label>API Token</label>
+<input
+    id="token"
+    type="password"
+    placeholder="Paste Kobo API Token">
+
+<label>Form / Asset UID</label>
+<input
+    id="assetUid"
+    placeholder="e.g. aWKJiwMPNGesLfzxdL7dCM">
+
+<label>Permission</label>
+<select id="permission">
+    <option value="add_submissions">Add submissions</option>
+    <option value="view_submissions">View submissions</option>
+    <option value="change_asset">Edit form</option>
+    <option value="validate_submissions">Validate submissions</option>
+</select>
+
+<label>CSV File</label>
+<input id="csvFile" type="file" accept=".csv">
+
+<p>
+CSV must contain a column named:
+<b>username</b>
+</p>
+
+<button onclick="uploadPermissions()">
+Assign Permissions
+</button>
+
+<div id="log"></div>
+
+<script>
+
+function log(msg){
+    document.getElementById('log').textContent += msg + '\n';
+}
+
+function parseCSV(text){
+
+    const rows = text.trim().split(/\r?\n/);
+    const headers = rows[0].split(',');
+
+    const usernameIndex =
+        headers.findIndex(h =>
+            h.trim().toLowerCase() === 'username');
+
+    if(usernameIndex === -1){
+        throw new Error(
+            'CSV must contain a username column'
+        );
+    }
+
+    const users = [];
+
+    for(let i=1;i<rows.length;i++){
+
+        const cols = rows[i].split(',');
+
+        const username =
+            cols[usernameIndex]?.trim();
+
+        if(username){
+            users.push(username);
+        }
+    }
+
+    return users;
+}
+
+async function uploadPermissions(){
+
+    document.getElementById('log').textContent='';
+
+    try{
+
+        const server =
+            document.getElementById('server').value.replace(/\/$/,'');
+
+        const token =
+            document.getElementById('token').value.trim();
+
+        const assetUid =
+            document.getElementById('assetUid').value.trim();
+
+        const permissionCode =
+            document.getElementById('permission').value;
+
+        const file =
+            document.getElementById('csvFile').files[0];
+
+        if(!token || !assetUid || !file){
+            throw new Error(
+                'Token, Asset UID and CSV are required.'
+            );
+        }
+
+        const csvText = await file.text();
+
+        const usernames = parseCSV(csvText);
+
+        log(`Found ${usernames.length} usernames`);
+
+        const permissionUrl =
+            `${server}/api/v2/permissions/${permissionCode}/`;
+
+        const payload = usernames.map(username => ({
+            user: `${server}/api/v2/users/${username}/`,
+            permission: permissionUrl
+        }));
+
+        log('Sending request...');
+
+        const response = await fetch(
+            `${server}/api/v2/assets/${assetUid}/permission-assignments/bulk/`,
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Token ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            }
+        );
+
+        const result = await response.text();
+
+        if(response.ok){
+            log('SUCCESS');
+            log(result);
+        }else{
+            log('FAILED');
+            log(result);
+        }
+
+    }catch(err){
+        log('ERROR: ' + err.message);
+    }
+}
+
+</script>
+
+</body>
+</html>
