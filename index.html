@@ -37,7 +37,7 @@
   .toggle-btn:hover { border-color: #378ADD; color: #185FA5; }
   .toggle-btn.active { border-color: #378ADD; background: #EBF4FC; color: #185FA5; font-weight: 600; }
   /* Operation selector — larger cards */
-  .op-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 0; }
+  .op-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 0; }
   .op-card { border: 2px solid #e4e2dc; border-radius: 12px; padding: 1.25rem; cursor: pointer; transition: all .2s; background: #fafaf8; text-align: center; }
   .op-card:hover { border-color: #378ADD; background: #EBF4FC; }
   .op-card.active { border-color: #185FA5; background: #EBF4FC; }
@@ -70,6 +70,8 @@
   .btn-primary:disabled { background: #e0ddd6; color: #aaa; cursor: not-allowed; }
   .btn-primary.teal { background: #6B4EAD; }
   .btn-primary.teal:hover:not(:disabled) { background: #533C8A; }
+  .btn-primary.purple { background: #6B4EAD; }
+  .btn-primary.purple:hover:not(:disabled) { background: #533C8A; }
   .progress-wrap { background: #eee; border-radius: 20px; height: 8px; margin: 1rem 0; overflow: hidden; }
   .progress-bar { height: 100%; background: #1D9E75; border-radius: 20px; width: 0%; transition: width .3s; }
   .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 1rem; }
@@ -171,6 +173,11 @@
         <div class="op-title">Edit Existing Records</div>
         <div class="op-desc">Bulk-update field values in existing KoboToolbox submissions via API</div>
       </div>
+      <div class="op-card" id="op-perms" onclick="setOperation('perms')">
+        <svg width="28" height="28" fill="none" stroke="#6B4EAD" stroke-width="1.8" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        <div class="op-title">Manage Permissions</div>
+        <div class="op-desc">Bulk-assign access permissions to a list of usernames via API</div>
+      </div>
     </div>
   </div>
 
@@ -230,6 +237,18 @@
           <div class="setup-step"><div class="setup-step-num">5</div><div class="setup-step-text">In the Connection section, set Server to <strong>Custom URL…</strong>, paste your Worker URL, and click <strong>Test connection</strong>.</div></div>
           <div class="setup-step"><div class="setup-step-num">6</div><div class="setup-step-text">Your Excel file must include a <strong>_id</strong> column (KoboToolbox submission ID) alongside the fields you want to update. Export your existing data from KoboToolbox first to get those IDs.</div></div>
           <div class="setup-note">&#9432; The Worker is required for edit operations — all PATCH calls go through it. Your token is never stored.</div>
+        </div>
+
+        <!-- Permissions guide: Cloudflare required -->
+        <div id="guide-perms" style="display:none">
+          <div class="info-box info" style="margin-bottom:.9rem">&#9432; Assigning permissions calls KoboToolbox's API directly — the <strong>Cloudflare Worker proxy is required</strong> to relay these requests from your browser.</div>
+          <div class="setup-step"><div class="setup-step-num">1</div><div class="setup-step-text">Go to <a href="https://workers.cloudflare.com" target="_blank" rel="noopener" style="color:#185FA5;font-weight:600;text-decoration:underline">workers.cloudflare.com</a> and sign up for a free account.</div></div>
+          <div class="setup-step"><div class="setup-step-num">2</div><div class="setup-step-text">Click <strong>Create Worker</strong> and delete all the default code in the editor.</div></div>
+          <div class="setup-step"><div class="setup-step-num">3</div><div class="setup-step-text">Download and open <strong>kobo_cors_proxy_worker.js</strong>, copy all its contents, and paste into the Cloudflare editor.</div></div>
+          <div class="setup-step"><div class="setup-step-num">4</div><div class="setup-step-text">Click <strong>Save &amp; Deploy</strong>. Copy your Worker URL:<br><code style="font-family:monospace;font-size:12px">https://kobo-proxy.YOUR-NAME.workers.dev</code></div></div>
+          <div class="setup-step"><div class="setup-step-num">5</div><div class="setup-step-text">In the Connection section, set Server to <strong>Custom URL…</strong>, paste your Worker URL, and click <strong>Test connection</strong>.</div></div>
+          <div class="setup-step"><div class="setup-step-num">6</div><div class="setup-step-text">Your Excel file needs one column containing <strong>KoboToolbox usernames</strong> — the exact account usernames (not emails or display names) to grant access to.</div></div>
+          <div class="setup-note">&#9432; You must be the form owner or have "Manage" permission to assign permissions to others.</div>
         </div>
 
       </div>
@@ -399,6 +418,57 @@
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Pause
           </button>
           <button class="btn-cancel" onclick="cancelEdits()">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>Cancel
+          </button>
+        </div>
+      </div>
+
+      <!-- Permissions action -->
+      <div id="action-perms" style="display:none">
+        <div class="info-box info" style="margin-bottom:1rem">
+          &#9432; Uses <code style="font-size:11px;background:#e8f1fb;padding:1px 5px;border-radius:4px">POST /api/v2/assets/{uid}/permission-assignments/</code> to grant access. One request is sent per username.
+        </div>
+        <div class="field-row">
+          <label>Username column</label>
+          <select id="username-col"></select>
+        </div>
+        <div class="field-row">
+          <label>Permission level</label>
+          <select id="permission-level">
+            <option value="view_asset">View form (view_asset)</option>
+            <option value="view_submissions" selected>View submissions (view_submissions)</option>
+            <option value="add_submissions">Add submissions (add_submissions)</option>
+            <option value="change_submissions">Edit submissions (change_submissions)</option>
+            <option value="validate_submissions">Validate submissions (validate_submissions)</option>
+            <option value="delete_submissions">Delete submissions (delete_submissions)</option>
+            <option value="change_asset">Edit form (change_asset)</option>
+            <option value="manage_asset">Manage project — full access (manage_asset)</option>
+          </select>
+        </div>
+        <p class="hint" style="margin-bottom:.5rem">&#9432; "Manage project" grants all permissions automatically and implies the others.</p>
+        <div class="field-row">
+          <label>Rows to process</label>
+          <select id="row-range-perms"><option value="all">All rows</option><option value="range">Custom range…</option></select>
+        </div>
+        <div id="range-inputs-perms" style="display:none;margin-bottom:8px">
+          <div class="field-row"><label>From row</label><input type="number" id="range-from-perms" value="1" min="1" style="width:80px;flex:none" /></div>
+          <div class="field-row"><label>To row</label><input type="number" id="range-to-perms" value="70" min="1" style="width:80px;flex:none" /></div>
+        </div>
+        <div class="field-row">
+          <label>Delay (ms)</label>
+          <input type="range" min="0" max="2000" step="100" value="300" id="delay-slider-perms" oninput="document.getElementById('delay-val-perms').textContent=this.value+'ms'" style="flex:1" />
+          <span style="font-size:13px;min-width:48px;text-align:right" id="delay-val-perms">300ms</span>
+        </div>
+        <p class="hint" style="margin-bottom:1rem">&#9432; A small delay avoids rate-limiting on large batches.</p>
+        <button class="btn-primary purple" id="perms-btn" onclick="startPermissions()" disabled>
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+          Assign permissions
+        </button>
+        <div class="ctrl-row" id="ctrl-row-perms" style="display:none">
+          <button class="btn-pause" id="pause-btn-perms" onclick="togglePausePerms()">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Pause
+          </button>
+          <button class="btn-cancel" onclick="cancelPermissions()">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>Cancel
           </button>
         </div>
@@ -787,22 +857,25 @@ function loadMainSheet() {
 
   // Update all "To row" inputs with actual row count
   const count = mainData.length;
-  ['range-to','range-to-csv','range-to-edit'].forEach(id => {
+  ['range-to','range-to-csv','range-to-edit','range-to-perms'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = count;
   });
   // Reset all range dropdowns to "All rows" and hide range inputs
-  ['row-range','row-range-csv','row-range-edit'].forEach(id => {
+  ['row-range','row-range-csv','row-range-edit','row-range-perms'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = 'all';
   });
-  ['range-inputs','range-inputs-csv','range-inputs-edit'].forEach(id => {
+  ['range-inputs','range-inputs-csv','range-inputs-edit','range-inputs-perms'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
   // Show record count
   const countEl = document.getElementById('record-count');
   if (countEl) countEl.textContent = count + ' record' + (count !== 1 ? 's' : '') + ' found';
+
+  // Populate username column selector if in permissions mode
+  if (currentOp === 'perms') populateUsernameColumn();
 
   refreshSubmitBtn();
 }
@@ -965,6 +1038,10 @@ document.addEventListener('change', function(e) {
   if (e.target.id === 'row-range-edit') {
     document.getElementById('range-inputs-edit').style.display = e.target.value === 'range' ? 'block' : 'none';
     document.getElementById('range-to-edit').value = mainData.length || 1;
+  }
+  if (e.target.id === 'row-range-perms') {
+    document.getElementById('range-inputs-perms').style.display = e.target.value === 'range' ? 'block' : 'none';
+    document.getElementById('range-to-perms').value = mainData.length || 1;
   }
 });
 
@@ -1373,6 +1450,7 @@ function setOperation(op) {
   currentOp = op;
   document.getElementById('op-submit').classList.toggle('active', op === 'submit');
   document.getElementById('op-edit').classList.toggle('active', op === 'edit');
+  document.getElementById('op-perms').classList.toggle('active', op === 'perms');
   document.getElementById('badge-1').classList.add('done');
 
   // Show/hide sections based on operation
@@ -1381,27 +1459,36 @@ function setOperation(op) {
   document.getElementById('sec-survey-mode').style.display = op === 'submit' ? 'block' : 'none';
   document.getElementById('action-submit').style.display   = op === 'submit' ? 'block' : 'none';
   document.getElementById('action-edit').style.display     = op === 'edit'   ? 'block' : 'none';
+  document.getElementById('action-perms').style.display    = op === 'perms'  ? 'block' : 'none';
   document.getElementById('edit-upload-hint').style.display= op === 'edit'   ? 'block' : 'none';
 
-  // Step numbering — survey mode skipped for edit (steps shift)
+  // Column mapping section: full grid for submit/edit, hidden+replaced for perms
+  document.getElementById('sec-map').style.display = op === 'perms' ? 'none' : 'block';
+
+  // Step numbering — survey mode skipped for edit/perms (steps shift)
   document.getElementById('badge-upload').textContent = op === 'submit' ? '5' : '4';
   document.getElementById('badge-map').textContent    = op === 'submit' ? '6' : '5';
 
   // Setup guide content
   document.getElementById('guide-submit').style.display = op === 'submit' ? 'block' : 'none';
   document.getElementById('guide-edit').style.display   = op === 'edit'   ? 'block' : 'none';
-  document.getElementById('guide-title').textContent    = op === 'submit'
-    ? 'Setup guide — ZIP needs no setup, Cloudflare Worker only for API tab'
-    : 'Setup guide — Cloudflare Worker required for edit operations';
-  document.getElementById('guide-intro').textContent = op === 'submit'
-    ? 'The ZIP export works from any browser with no setup. The Cloudflare Worker is only needed for the Edit Existing Records operation.'
-    : 'Edit operations call the KoboToolbox API directly from your browser. A Cloudflare Worker proxy is required to relay these requests.';
+  document.getElementById('guide-perms').style.display  = op === 'perms'  ? 'block' : 'none';
+  document.getElementById('guide-title').textContent    =
+    op === 'submit' ? 'Setup guide — ZIP needs no setup, Cloudflare Worker only for API tab'
+    : op === 'edit' ? 'Setup guide — Cloudflare Worker required for edit operations'
+    : 'Setup guide — Cloudflare Worker required for managing permissions';
+  document.getElementById('guide-intro').textContent =
+    op === 'submit' ? 'The ZIP export works from any browser with no setup. The Cloudflare Worker is only needed for the Edit Existing Records and Manage Permissions operations.'
+    : op === 'edit' ? 'Edit operations call the KoboToolbox API directly from your browser. A Cloudflare Worker proxy is required to relay these requests.'
+    : 'Assigning permissions calls the KoboToolbox API directly from your browser. A Cloudflare Worker proxy is required to relay these requests.';
 
   // Action title
-  document.getElementById('action-title').textContent = op === 'submit' ? 'Export / Submit' : 'Apply edits';
+  document.getElementById('action-title').textContent =
+    op === 'submit' ? 'Export / Submit' : op === 'edit' ? 'Apply edits' : 'Assign permissions';
 
-  // Reset edit button state if file loaded
+  // Reset button states if file loaded
   refreshSubmitBtn();
+  if (op === 'perms') populateUsernameColumn();
 
   // Scroll to guide
   document.getElementById('steps-container').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1540,9 +1627,124 @@ function refreshSubmitBtn() {
   const submitEl = document.getElementById('submit-btn');
   const exportEl = document.getElementById('export-btn');
   const editEl   = document.getElementById('edit-btn');
+  const permsEl  = document.getElementById('perms-btn');
   if (submitEl) submitEl.disabled = !(hasConn && hasData);
   if (exportEl) exportEl.disabled = !hasData;
   if (editEl)   editEl.disabled   = !(hasConn && hasData);
+  if (permsEl)  permsEl.disabled  = !(hasConn && hasData);
+}
+
+// ── Manage Permissions ─────────────────────────────────────────
+function populateUsernameColumn() {
+  const sel = document.getElementById('username-col');
+  if (!sel || !mainData.length) return;
+  const cols = Object.keys(mainData[0]);
+  sel.innerHTML = cols.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+  const guess = cols.find(c => /user(name)?/i.test(c));
+  if (guess) sel.value = guess;
+}
+
+let permsRunning = false, permsPaused = false, permsCancelled = false;
+
+function togglePausePerms() {
+  permsPaused = !permsPaused;
+  const btn = document.getElementById('pause-btn-perms');
+  if (permsPaused) {
+    btn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg> Resume';
+    btn.style.cssText = 'background:#E1F5EE;color:#0F6E56;border-color:#1D9E75;';
+  } else {
+    btn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Pause';
+    btn.style.cssText = '';
+  }
+}
+
+function cancelPermissions() {
+  if (!confirm('Cancel? Permissions already assigned will not be reverted.')) return;
+  permsCancelled = true; permsRunning = false; permsPaused = false;
+  document.getElementById('ctrl-row-perms').style.display = 'none';
+  document.getElementById('perms-btn').disabled = false;
+  document.getElementById('perms-btn').innerHTML = '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg> Assign permissions';
+  addLog('—', 'pend', 'Cancelled by user');
+}
+
+async function startPermissions() {
+  const token   = document.getElementById('api-token').value.trim();
+  const formUid = document.getElementById('form-uid').value.trim();
+  const serverUrl = getServerUrl();
+  if (!token || !formUid || !mainData.length) {
+    alert('Please complete connection test and upload a file first.'); return;
+  }
+
+  const usernameCol = document.getElementById('username-col').value;
+  const permCode     = document.getElementById('permission-level').value;
+  if (!usernameCol) { alert('Please select a username column.'); return; }
+
+  let rows = mainData;
+  if (document.getElementById('row-range-perms').value === 'range') {
+    const from = Math.max(0, parseInt(document.getElementById('range-from-perms').value)-1)||0;
+    const to   = parseInt(document.getElementById('range-to-perms').value)||rows.length;
+    rows = rows.slice(from, to);
+  }
+
+  const usernames = [...new Set(rows.map(r => String(r[usernameCol] ?? '').trim()).filter(Boolean))];
+  if (!usernames.length) { alert('No usernames found in the selected column.'); return; }
+
+  const delay = parseInt(document.getElementById('delay-slider-perms').value)||300;
+  logEntries = []; failedRows = []; permsCancelled = false; permsPaused = false;
+  permsRunning = true;
+  document.getElementById('sec-results').style.display = 'block';
+  document.getElementById('log-wrap').innerHTML = '';
+  document.getElementById('retry-btn').style.display = 'none';
+  updateStats(0, 0, 0, usernames.length);
+  document.getElementById('perms-btn').disabled = true;
+  document.getElementById('perms-btn').innerHTML = '&#9654; Assigning…';
+  document.getElementById('ctrl-row-perms').style.display = 'flex';
+
+  const url = `${serverUrl}/api/v2/assets/${formUid}/permission-assignments/`;
+  const permUrl = `${serverUrl}/api/v2/permissions/${permCode}/`;
+  let ok = 0, err = 0;
+
+  for (let i = 0; i < usernames.length; i++) {
+    if (permsCancelled) break;
+    while (permsPaused && !permsCancelled) await sleep(200);
+    if (permsCancelled) break;
+
+    const username = usernames[i];
+    const userUrl = `${serverUrl}/api/v2/users/${encodeURIComponent(username)}/`;
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Authorization': 'Token '+token, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ user: userUrl, permission: permUrl })
+      });
+      if (!resp.ok) {
+        const j = await resp.json().catch(() => ({}));
+        let msg = j.detail || JSON.stringify(j);
+        if (resp.status === 404) msg = `User "${username}" not found on this server`;
+        if (resp.status === 400 && Array.isArray(j) && j[0]) msg = j[0].user ? j[0].user[0] : msg;
+        throw new Error(msg);
+      }
+      ok++;
+      addLog(i+1, 'ok', `${username} — ${permCode} granted`);
+      logEntries.push({row:i+1, status:'ok', message:`${username} — ${permCode} granted`});
+    } catch(e) {
+      err++;
+      addLog(i+1, 'err', `${username}: ${e.message}`);
+      logEntries.push({row:i+1, status:'error', message:`${username}: ${e.message}`});
+      failedRows.push(rows.find(r => String(r[usernameCol]).trim() === username) || { [usernameCol]: username });
+    }
+    updateStats(i+1, ok, err, usernames.length);
+    if (i < usernames.length-1 && !permsCancelled) await sleep(delay);
+  }
+
+  permsRunning = false;
+  document.getElementById('ctrl-row-perms').style.display = 'none';
+  document.getElementById('perms-btn').disabled = false;
+  document.getElementById('perms-btn').innerHTML = permsCancelled
+    ? '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg> Assign permissions'
+    : '&#10003; Done — click to re-apply';
+  if (failedRows.length > 0) document.getElementById('retry-btn').style.display = 'flex';
+  document.getElementById('sec-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 </script>
 
