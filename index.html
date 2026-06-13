@@ -205,7 +205,7 @@
           <div class="setup-step"><div class="setup-step-num">2</div><div class="setup-step-text">Click <strong>Create Worker</strong> and delete all the default code in the editor.</div></div>
           <div class="setup-step"><div class="setup-step-num">3</div><div class="setup-step-text">Download and open <strong>kobo_cors_proxy_worker.js</strong>, copy all its contents, and paste into the Cloudflare editor.</div></div>
           <div class="setup-step"><div class="setup-step-num">4</div><div class="setup-step-text">Click <strong>Save &amp; Deploy</strong>. Copy your permanent Worker URL:<br><code style="font-family:monospace;font-size:12px">https://kobo-proxy.YOUR-NAME.workers.dev</code></div></div>
-          <div class="setup-step"><div class="setup-step-num">5</div><div class="setup-step-text">In the Connection section, paste your Worker URL into the <strong>Cloudflare Proxy</strong> field (a default is pre-filled — replace it with your own), then click <strong>Test connection</strong>.</div></div>
+          <div class="setup-step"><div class="setup-step-num">5</div><div class="setup-step-text">In the Connection section, paste your Worker URL into the <strong>Cloudflare Proxy</strong> field (a default is pre-filled — replace it with your own), then click <strong>Connect</strong>.</div></div>
           <div class="setup-note">&#9432; The Worker only forwards requests to eu.kobotoolbox.org. Your API token is never stored or logged.</div>
         </div>
 
@@ -216,7 +216,7 @@
           <div class="setup-step"><div class="setup-step-num">2</div><div class="setup-step-text">Click <strong>Create Worker</strong> and delete all the default code in the editor.</div></div>
           <div class="setup-step"><div class="setup-step-num">3</div><div class="setup-step-text">Download and open <strong>kobo_cors_proxy_worker.js</strong>, copy all its contents, and paste into the Cloudflare editor.</div></div>
           <div class="setup-step"><div class="setup-step-num">4</div><div class="setup-step-text">Click <strong>Save &amp; Deploy</strong>. Copy your Worker URL:<br><code style="font-family:monospace;font-size:12px">https://kobo-proxy.YOUR-NAME.workers.dev</code></div></div>
-          <div class="setup-step"><div class="setup-step-num">5</div><div class="setup-step-text">In the Connection section, paste your Worker URL into the <strong>Cloudflare Proxy</strong> field (a default is pre-filled — replace it with your own), then click <strong>Test connection</strong>.</div></div>
+          <div class="setup-step"><div class="setup-step-num">5</div><div class="setup-step-text">In the Connection section, paste your Worker URL into the <strong>Cloudflare Proxy</strong> field (a default is pre-filled — replace it with your own), then click <strong>Connect</strong>.</div></div>
           <div class="setup-step"><div class="setup-step-num">6</div><div class="setup-step-text">Your Excel file must include a <strong>_id</strong> column (KoboToolbox submission ID) alongside the fields you want to update. Export your existing data from KoboToolbox first to get those IDs.</div></div>
           <div class="setup-note">&#9432; The Worker is required for edit operations — all PATCH calls go through it. Your token is never stored.</div>
         </div>
@@ -228,7 +228,7 @@
           <div class="setup-step"><div class="setup-step-num">2</div><div class="setup-step-text">Click <strong>Create Worker</strong> and delete all the default code in the editor.</div></div>
           <div class="setup-step"><div class="setup-step-num">3</div><div class="setup-step-text">Download and open <strong>kobo_cors_proxy_worker.js</strong>, copy all its contents, and paste into the Cloudflare editor.</div></div>
           <div class="setup-step"><div class="setup-step-num">4</div><div class="setup-step-text">Click <strong>Save &amp; Deploy</strong>. Copy your Worker URL:<br><code style="font-family:monospace;font-size:12px">https://kobo-proxy.YOUR-NAME.workers.dev</code></div></div>
-          <div class="setup-step"><div class="setup-step-num">5</div><div class="setup-step-text">In the Connection section, paste your Worker URL into the <strong>Cloudflare Proxy</strong> field (a default is pre-filled — replace it with your own), then click <strong>Test connection</strong>.</div></div>
+          <div class="setup-step"><div class="setup-step-num">5</div><div class="setup-step-text">In the Connection section, paste your Worker URL into the <strong>Cloudflare Proxy</strong> field (a default is pre-filled — replace it with your own), then click <strong>Connect</strong>.</div></div>
           <div class="setup-step"><div class="setup-step-num">6</div><div class="setup-step-text">Your Excel file needs one column containing <strong>KoboToolbox usernames</strong> — the exact account usernames (not emails or display names) to grant access to.</div></div>
           <div class="setup-note">&#9432; You must be the form owner or have "Manage" permission to assign permissions to others.</div>
         </div>
@@ -265,9 +265,9 @@
       <div class="connect-row">
         <button class="btn-connect" id="btn-connect" onclick="testConnection()">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0114.08 0"/><path d="M1.42 9a16 16 0 0121.16 0"/><path d="M8.53 16.11a6 6 0 016.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/></svg>
-          Test connection
+          Connect
         </button>
-        <div class="conn-status idle" id="conn-status"><span id="conn-status-text">Not tested yet</span></div>
+        <div class="conn-status idle" id="conn-status"><span id="conn-status-text">Not connected yet</span></div>
       </div>
       <div id="conn-info-box" style="display:none"></div>
       <div id="form-meta" style="display:none" class="form-meta"></div>
@@ -532,7 +532,7 @@ function getKoboServer() {
 
 function resetConnStatus() {
   connVerified = false; canSubmit = false; koboFields = []; koboNoteFields = []; koboIdString = ''; koboVersion = ''; koboEnketoUrl = ''; koboFormUuid = '';
-  setConnUI('idle', 'Not tested yet');
+  setConnUI('idle', 'Not connected yet');
   document.getElementById('conn-info-box').style.display = 'none';
   document.getElementById('form-meta').style.display = 'none';
   document.getElementById('badge-1').classList.remove('done');
@@ -563,24 +563,6 @@ async function testConnection() {
   document.getElementById('form-meta').style.display = 'none';
 
   try {
-    // 0. Debug: verify Authorization header reaches the Worker
-    const debugUrl = server + '/debug/';
-    try {
-      const debugResp = await fetch(debugUrl, {
-        method: 'GET',
-        headers: { 'Authorization': 'Token ' + token, 'Accept': 'application/json' }
-      });
-      const debugData = await debugResp.json();
-      const authHeader = debugData.headers && debugData.headers['authorization'];
-      console.log('[KoboDebug] Headers received by Worker:', debugData.headers);
-      console.log('[KoboDebug] Authorization header at Worker:', authHeader || 'MISSING ⚠️');
-      if (!authHeader) {
-        showInfoBox('warning', '⚠️ <strong>Authorization header is being stripped</strong> before reaching the Worker. The token never arrives at Kobo. This is likely a browser CORS pre-flight stripping issue — see console for details.');
-      }
-    } catch(e) {
-      console.log('[KoboDebug] Debug endpoint not available or not a proxy URL — skipping.');
-    }
-
     // 1. Check token validity + form access
     const assetUrl = `${server}/api/v2/assets/${formUid}/?format=json`;
     const resp = await fetch(assetUrl, {
@@ -651,27 +633,18 @@ async function testConnection() {
       koboVersion = s?.version || '';
     }
 
-    // Log all candidate fields so we can diagnose mismatches
-    console.log('[KoboConnect] Asset keys:', Object.keys(asset).join(', '));
-    console.log('[KoboConnect] id_string candidates:', {
-      'asset.id_string':              asset.id_string,
-      'asset.deployment__identifier': asset.deployment__identifier,
-      'asset.uid':                    asset.uid,
-      'content.settings.id_string':   asset.content?.settings?.[0]?.id_string || asset.content?.settings?.id_string,
-    });
-    console.log('[KoboConnect] Using id_string:', koboIdString, '| formUuid:', koboFormUuid, '| version:', koboVersion);
     const survey = (asset.content && asset.content.survey) ? asset.content.survey : [];
     survey.forEach(field => {
       const name = field.name || field.$autoname;
       const type = String(field.type || '').trim().toLowerCase();
-      const excludedTypes = ['note', 'begin_score', 'end_score', 'begin_rank', 'end_rank'];
-      if (name && !type.startsWith('begin_') && !type.startsWith('end_') && !excludedTypes.includes(type)) {
+      if (!name) return;
+      if (type === 'note') { koboNoteFields.push(name); return; }
+      const excludedTypes = ['begin_score', 'end_score', 'begin_rank', 'end_rank'];
+      if (!type.startsWith('begin_') && !type.startsWith('end_') && !excludedTypes.includes(type)) {
         const label = (field.label && field.label[0]) ? field.label[0] : name;
         koboFields.push({ name, label, type });
       }
     });
-    console.log('[KoboConnect] All survey fields (name: type):', survey.map(f => `${f.name || f.$autoname}: ${f.type}`).join(', '));
-    console.log('[KoboConnect] koboFields after filter (note excluded):', koboFields.map(f => `${f.name} (${f.type})`).join(', '));
 
     // 4. Set UI
     const formName = asset.name || formUid;
@@ -883,7 +856,7 @@ function showPreview(data) {
 // ── Mapping ───────────────────────────────────────────────────
 function buildMapping() {
   if (!mainData.length) return;
-  const cols = Object.keys(mainData[0]);
+  const cols = Object.keys(mainData[0]).filter(c => !koboNoteFields.includes(c));
   const wrap = document.getElementById('map-list');
 
   // Build kobo options HTML (grouped if fields available)
@@ -1151,10 +1124,6 @@ async function exportZip() {
         `<rootUuid>${rootUUID}</rootUuid>` +
       `</meta>` +
       `</${rootTag}>`;
-    if (i === 0) {
-      console.log('[KoboZip] id_string:', idString, '| rootTag:', rootTag, '| formUuid:', formUuid, '| version:', koboVersion);
-      console.log('[KoboZip] First XML instance:', xml);
-    }
     return { name: `submission_${String(i+1).padStart(4,'0')}_${instanceUUID}.xml`, xml };
   });
 
@@ -1209,8 +1178,6 @@ let workingEndpoint = null;
 
 async function submitOne(row, token, serverUrl, formUid) {
   const payload = buildPayload(row);
-  console.log('[KoboSubmit] Payload:', payload);
-  console.log('[KoboSubmit] id_string:', koboIdString, '| version:', koboVersion);
 
   // If the server URL is our Cloudflare Worker proxy, use its
   // server-side /submit/ endpoint — bypasses browser permission
