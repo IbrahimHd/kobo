@@ -493,7 +493,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
 let workbook=null, mainData=[], mode='flat', logEntries=[], failedRows=[], allSheets=[], repeatSheetCount=0;
-let koboFields=[], connVerified=false, canSubmit=false, koboIdString='', koboVersion='', koboEnketoUrl='', koboFormUuid='';
+let koboFields=[], koboNoteFields=[], connVerified=false, canSubmit=false, koboIdString='', koboVersion='', koboEnketoUrl='', koboFormUuid='';
 
 // ── Setup guide helpers ───────────────────────────────────────
 function switchTab(id, btn) {
@@ -531,7 +531,7 @@ function getKoboServer() {
 }
 
 function resetConnStatus() {
-  connVerified = false; canSubmit = false; koboFields = []; koboIdString = ''; koboVersion = ''; koboEnketoUrl = ''; koboFormUuid = '';
+  connVerified = false; canSubmit = false; koboFields = []; koboNoteFields = []; koboIdString = ''; koboVersion = ''; koboEnketoUrl = ''; koboFormUuid = '';
   setConnUI('idle', 'Not tested yet');
   document.getElementById('conn-info-box').style.display = 'none';
   document.getElementById('form-meta').style.display = 'none';
@@ -663,12 +663,15 @@ async function testConnection() {
     const survey = (asset.content && asset.content.survey) ? asset.content.survey : [];
     survey.forEach(field => {
       const name = field.name || field.$autoname;
-      const type = field.type || '';
-      if (name && !type.startsWith('begin_') && !type.startsWith('end_') && type !== 'note') {
+      const type = String(field.type || '').trim().toLowerCase();
+      const excludedTypes = ['note', 'begin_score', 'end_score', 'begin_rank', 'end_rank'];
+      if (name && !type.startsWith('begin_') && !type.startsWith('end_') && !excludedTypes.includes(type)) {
         const label = (field.label && field.label[0]) ? field.label[0] : name;
         koboFields.push({ name, label, type });
       }
     });
+    console.log('[KoboConnect] All survey fields (name: type):', survey.map(f => `${f.name || f.$autoname}: ${f.type}`).join(', '));
+    console.log('[KoboConnect] koboFields after filter (note excluded):', koboFields.map(f => `${f.name} (${f.type})`).join(', '));
 
     // 4. Set UI
     const formName = asset.name || formUid;
