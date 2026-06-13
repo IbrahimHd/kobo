@@ -54,15 +54,20 @@
   .upload-zone.drag-over { border-color: #185FA5; background: #d0e8f8; transform: scale(1.01); }
   .upload-zone.has-file { border-style: solid; border-color: #1D9E75; background: #edfaf4; }
   .upload-zone.has-file svg, .upload-zone.has-file p { color: #0F6E56; }
-  .mapping-grid { display: grid; grid-template-columns: 1fr 20px 1fr; gap: 8px; align-items: center; margin-bottom: 4px; }
-  .mapping-grid-custom { display: grid; grid-template-columns: 1fr 20px 1fr 1fr; gap: 8px; align-items: center; margin-bottom: 4px; }
-  .mapping-row-wrap { margin-bottom: 7px; }
-  .custom-name-inline { display: none; }
-  .custom-name-inline input { width: 100%; font-size: 12px; height: 32px; border: 1px solid #378ADD; border-radius: 7px; padding: 0 8px; background: #fafaf8; outline: none; }
+  .mapping-grid { display: grid; grid-template-columns: minmax(0,1fr) 20px minmax(0,1fr); gap: 8px; align-items: center; margin-bottom: 4px; }
+  .mapping-grid-custom { display: grid; grid-template-columns: minmax(0,1fr) 20px minmax(0,1fr) minmax(0,1fr); gap: 8px; align-items: center; margin-bottom: 4px; }
+  .mapping-row-wrap { margin-bottom: 7px; min-width: 0; }
+  .custom-name-inline { display: none; min-width: 0; }
+  .custom-name-inline input { width: 100%; max-width: 100%; box-sizing: border-box; font-size: 12px; height: 32px; border: 1px solid #378ADD; border-radius: 7px; padding: 0 8px; background: #fafaf8; outline: none; }
   .custom-name-inline input:focus { box-shadow: 0 0 0 3px rgba(55,138,221,0.12); }
-  .col-label { font-size: 12px; padding: 6px 10px; background: #f5f4f0; border-radius: 7px; border: 1px solid #e4e2dc; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .mapping-grid svg { color: #bbb; }
-  .mapping-grid select { font-size: 12px; height: 32px; padding: 0 8px; }
+  .col-label { font-size: 12px; padding: 6px 10px; background: #f5f4f0; border-radius: 7px; border: 1px solid #e4e2dc; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .mapping-grid svg, .mapping-grid-custom svg { color: #bbb; }
+  .mapping-grid select, .mapping-grid-custom select {
+    font-size: 12px; height: 32px; padding: 0 8px;
+    width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box;
+    border: 1px solid #ddd; border-radius: 8px; background: #fafaf8; color: #1a1a1a; outline: none;
+  }
+  .mapping-grid select:focus, .mapping-grid-custom select:focus { border-color: #378ADD; box-shadow: 0 0 0 3px rgba(55,138,221,0.12); }
   .repeat-add-btn { font-size: 12px; color: #185FA5; background: none; border: none; cursor: pointer; padding: 4px 0; display: flex; align-items: center; gap: 5px; margin-top: 4px; }
   .repeat-add-btn:hover { text-decoration: underline; }
   .btn-primary { width: 100%; padding: 11px; background: #185FA5; color: #fff; border: none; border-radius: 9px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background .15s; }
@@ -136,7 +141,6 @@
   #sec-survey-mode { display: none; }
   #sec-map { display: block; }
   #sec-results { display: none; }
-  #custom-url-row { display: none; }
   #range-inputs { display: none; margin-bottom: 8px; }
   #range-inputs-csv { display: none; margin-bottom: 8px; }
   #repeat-sheets-wrap { display: none; margin-top: .9rem; }
@@ -196,35 +200,13 @@
 
         <!-- Submit guide: tabbed (ZIP needs nothing / Worker for API tab) -->
         <div id="guide-submit">
-          <div class="tab-bar">
-            <button class="tab-btn active" onclick="switchTab('cf',this)">
-              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-              Cloudflare Worker <span class="tab-badge">For API tab</span>
-            </button>
-            <button class="tab-btn" onclick="switchTab('py',this)">
-              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-              Python Local Server
-            </button>
-          </div>
-          <div class="tab-panel active" id="tab-cf">
-            <div class="tab-desc">&#9432; The ZIP export works from any browser with no setup needed. The Cloudflare Worker is only needed for the <strong>Edit Existing Records</strong> operation.</div>
-            <div class="setup-step"><div class="setup-step-num">1</div><div class="setup-step-text">Go to <a href="https://workers.cloudflare.com" target="_blank" rel="noopener" style="color:#185FA5;font-weight:600;text-decoration:underline">workers.cloudflare.com</a> and sign up for a free account.</div></div>
-            <div class="setup-step"><div class="setup-step-num">2</div><div class="setup-step-text">Click <strong>Create Worker</strong> and delete all the default code in the editor.</div></div>
-            <div class="setup-step"><div class="setup-step-num">3</div><div class="setup-step-text">Download and open <strong>kobo_cors_proxy_worker.js</strong>, copy all its contents, and paste into the Cloudflare editor.</div></div>
-            <div class="setup-step"><div class="setup-step-num">4</div><div class="setup-step-text">Click <strong>Save &amp; Deploy</strong>. Copy your permanent Worker URL:<br><code style="font-family:monospace;font-size:12px">https://kobo-proxy.YOUR-NAME.workers.dev</code></div></div>
-            <div class="setup-step"><div class="setup-step-num">5</div><div class="setup-step-text">In the Connection section, set Server to <strong>Custom URL…</strong>, paste your Worker URL, and click <strong>Test connection</strong>.</div></div>
-            <div class="setup-note">&#9432; The Worker only forwards requests to eu.kobotoolbox.org. Your API token is never stored or logged.</div>
-          </div>
-          <div class="tab-panel" id="tab-py">
-            <div class="tab-desc">&#128195; Session-based. Run a local server — must repeat each session.</div>
-            <div class="setup-step"><div class="setup-step-num">1</div><div class="setup-step-text">Make sure <a href="https://www.python.org/downloads/" target="_blank" rel="noopener" style="color:#185FA5;font-weight:600;text-decoration:underline">Python</a> is installed. Open a terminal (Windows: Win+R → cmd).</div></div>
-            <div class="setup-step"><div class="setup-step-num">2</div><div class="setup-step-text">Navigate to the folder where this file is saved:<br><code onclick="copyCode(this)">cd C:\Users\YourName\Downloads</code></div></div>
-            <div class="setup-step"><div class="setup-step-num">3</div><div class="setup-step-text">Start the local server:<br><code onclick="copyCode(this)">python -m http.server 8080</code></div></div>
-            <div class="setup-step"><div class="setup-step-num">4</div><div class="setup-step-text">Open Chrome and go to:<br><code onclick="copyCode(this)">http://localhost:8080/kobo_tool.html</code><br><span style="font-size:12px;color:#378ADD;display:inline-block;margin-top:5px">&#9432; Replace the filename if you renamed this file.</span></div></div>
-            <div class="setup-step"><div class="setup-step-num">5</div><div class="setup-step-text">Keep the terminal open while using the tool. Next time, repeat steps 3–4 only.</div></div>
-            <div class="setup-step"><div class="setup-step-num">6</div><div class="setup-step-text"><strong>Still blocked on localhost?</strong> Run a CORS proxy in a second terminal:<br><code onclick="copyCode(this)">npx local-cors-proxy --proxyUrl https://eu.kobotoolbox.org --port 8010</code><br>Then set the server URL to <code onclick="copyCode(this)">http://localhost:8010</code>. Requires <a href="https://nodejs.org" target="_blank" rel="noopener" style="color:#185FA5;font-weight:600;text-decoration:underline">Node.js</a>.</div></div>
-            <div class="setup-note">&#9432; Click any command above to copy it to your clipboard.</div>
-          </div>
+          <div class="info-box info" style="margin-bottom:.9rem">&#9432; The connection test and form lookup require the <strong>Cloudflare Worker proxy</strong> — KoboToolbox does not allow direct browser requests from any origin. The ZIP export itself runs entirely client-side once the form is connected.</div>
+          <div class="setup-step"><div class="setup-step-num">1</div><div class="setup-step-text">Go to <a href="https://workers.cloudflare.com" target="_blank" rel="noopener" style="color:#185FA5;font-weight:600;text-decoration:underline">workers.cloudflare.com</a> and sign up for a free account.</div></div>
+          <div class="setup-step"><div class="setup-step-num">2</div><div class="setup-step-text">Click <strong>Create Worker</strong> and delete all the default code in the editor.</div></div>
+          <div class="setup-step"><div class="setup-step-num">3</div><div class="setup-step-text">Download and open <strong>kobo_cors_proxy_worker.js</strong>, copy all its contents, and paste into the Cloudflare editor.</div></div>
+          <div class="setup-step"><div class="setup-step-num">4</div><div class="setup-step-text">Click <strong>Save &amp; Deploy</strong>. Copy your permanent Worker URL:<br><code style="font-family:monospace;font-size:12px">https://kobo-proxy.YOUR-NAME.workers.dev</code></div></div>
+          <div class="setup-step"><div class="setup-step-num">5</div><div class="setup-step-text">In the Connection section, paste your Worker URL into the <strong>Cloudflare Proxy</strong> field (a default is pre-filled — replace it with your own), then click <strong>Test connection</strong>.</div></div>
+          <div class="setup-note">&#9432; The Worker only forwards requests to eu.kobotoolbox.org. Your API token is never stored or logged.</div>
         </div>
 
         <!-- Edit guide: Cloudflare required -->
@@ -234,7 +216,7 @@
           <div class="setup-step"><div class="setup-step-num">2</div><div class="setup-step-text">Click <strong>Create Worker</strong> and delete all the default code in the editor.</div></div>
           <div class="setup-step"><div class="setup-step-num">3</div><div class="setup-step-text">Download and open <strong>kobo_cors_proxy_worker.js</strong>, copy all its contents, and paste into the Cloudflare editor.</div></div>
           <div class="setup-step"><div class="setup-step-num">4</div><div class="setup-step-text">Click <strong>Save &amp; Deploy</strong>. Copy your Worker URL:<br><code style="font-family:monospace;font-size:12px">https://kobo-proxy.YOUR-NAME.workers.dev</code></div></div>
-          <div class="setup-step"><div class="setup-step-num">5</div><div class="setup-step-text">In the Connection section, set Server to <strong>Custom URL…</strong>, paste your Worker URL, and click <strong>Test connection</strong>.</div></div>
+          <div class="setup-step"><div class="setup-step-num">5</div><div class="setup-step-text">In the Connection section, paste your Worker URL into the <strong>Cloudflare Proxy</strong> field (a default is pre-filled — replace it with your own), then click <strong>Test connection</strong>.</div></div>
           <div class="setup-step"><div class="setup-step-num">6</div><div class="setup-step-text">Your Excel file must include a <strong>_id</strong> column (KoboToolbox submission ID) alongside the fields you want to update. Export your existing data from KoboToolbox first to get those IDs.</div></div>
           <div class="setup-note">&#9432; The Worker is required for edit operations — all PATCH calls go through it. Your token is never stored.</div>
         </div>
@@ -246,7 +228,7 @@
           <div class="setup-step"><div class="setup-step-num">2</div><div class="setup-step-text">Click <strong>Create Worker</strong> and delete all the default code in the editor.</div></div>
           <div class="setup-step"><div class="setup-step-num">3</div><div class="setup-step-text">Download and open <strong>kobo_cors_proxy_worker.js</strong>, copy all its contents, and paste into the Cloudflare editor.</div></div>
           <div class="setup-step"><div class="setup-step-num">4</div><div class="setup-step-text">Click <strong>Save &amp; Deploy</strong>. Copy your Worker URL:<br><code style="font-family:monospace;font-size:12px">https://kobo-proxy.YOUR-NAME.workers.dev</code></div></div>
-          <div class="setup-step"><div class="setup-step-num">5</div><div class="setup-step-text">In the Connection section, set Server to <strong>Custom URL…</strong>, paste your Worker URL, and click <strong>Test connection</strong>.</div></div>
+          <div class="setup-step"><div class="setup-step-num">5</div><div class="setup-step-text">In the Connection section, paste your Worker URL into the <strong>Cloudflare Proxy</strong> field (a default is pre-filled — replace it with your own), then click <strong>Test connection</strong>.</div></div>
           <div class="setup-step"><div class="setup-step-num">6</div><div class="setup-step-text">Your Excel file needs one column containing <strong>KoboToolbox usernames</strong> — the exact account usernames (not emails or display names) to grant access to.</div></div>
           <div class="setup-note">&#9432; You must be the form owner or have "Manage" permission to assign permissions to others.</div>
         </div>
@@ -257,7 +239,6 @@
     <div class="copy-toast" id="copy-toast">Copied to clipboard ✓</div>
 
     <!-- Step 3: Connection -->
-    <!-- Step 1: Connection -->
     <div class="card" id="card-conn">
       <div class="card-title"><span class="step-badge" id="badge-conn">3</span> KoboToolbox connection</div>
       <div class="field-row">
@@ -265,17 +246,16 @@
         <input type="password" id="api-token" placeholder="Paste your API token…" oninput="resetConnStatus()" />
       </div>
       <div class="field-row">
-        <label>Server</label>
-        <select id="server-url" onchange="onServerChange(); resetConnStatus()">
+        <label>Kobo Server</label>
+        <select id="server-url" onchange="resetConnStatus()">
           <option value="https://eu.kobotoolbox.org" selected>eu.kobotoolbox.org (EU — default)</option>
           <option value="https://kf.kobotoolbox.org">kf.kobotoolbox.org (Global)</option>
           <option value="https://kobo.humanitarianresponse.info">kobo.humanitarianresponse.info (UNHCR/OCHA)</option>
-          <option value="custom">Custom URL…</option>
         </select>
       </div>
-      <div class="field-row" id="custom-url-row">
-        <label>Custom URL</label>
-        <input type="text" id="custom-url" placeholder="https://…" oninput="resetConnStatus()" />
+      <div class="field-row">
+        <label>Cloudflare Proxy</label>
+        <input type="text" id="custom-url" placeholder="https://your-proxy.workers.dev" value="https://kobo.hammadibrahim.workers.dev" oninput="resetConnStatus()" />
       </div>
       <div class="field-row">
         <label>Form UID</label>
@@ -530,32 +510,24 @@ function copyCode(el) {
     setTimeout(() => toast.classList.remove('show'), 1800);
   });
 }
-function openSetupGuide(tab) {
+function openSetupGuide() {
   const guide = document.getElementById('setup-guide');
   if (guide) {
     guide.open = true;
-    if (tab) {
-      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      const panel = document.getElementById('tab-' + tab);
-      if (panel) panel.classList.add('active');
-      const btns = document.querySelectorAll('.tab-btn');
-      if (tab === 'cf' && btns[0]) btns[0].classList.add('active');
-      if (tab === 'py' && btns[1]) btns[1].classList.add('active');
-    }
     guide.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 }
 
 // ── Connection ──────────────────────────────────────────────
-function onServerChange() {
-  document.getElementById('custom-url-row').style.display =
-    document.getElementById('server-url').value === 'custom' ? 'flex' : 'none';
+// getServerUrl() returns the Cloudflare Proxy URL — used for all actual API calls.
+function getServerUrl() {
+  return document.getElementById('custom-url').value.trim().replace(/\/$/, '');
 }
 
-function getServerUrl() {
-  const val = document.getElementById('server-url').value;
-  return val === 'custom' ? document.getElementById('custom-url').value.replace(/\/$/, '') : val;
+// getKoboServer() returns the selected Kobo Server base URL — used only to derive
+// the correct KC (KoboCat) subdomain for the bulk-submission-form upload link.
+function getKoboServer() {
+  return document.getElementById('server-url').value;
 }
 
 function resetConnStatus() {
@@ -755,7 +727,7 @@ async function testConnection() {
         '&#10006; <strong>Browser CORS restriction</strong> — the tool is opened as a local file (<code>file://</code>), which blocks API calls. ' +
         'See the <a href="#setup-guide" onclick="openSetupGuide(\'cf\')" style="color:#A32D2D;font-weight:600;text-decoration:underline">setup guide at the top of the page</a> to fix this in under a minute.<br><br>' +
         '<em style="color:#c0392b;font-size:11px">Details: ' + escHtml(msg) + '</em>';
-      openSetupGuide('cf');
+      openSetupGuide();
     } else {
       // Hosted elsewhere — network issue or misconfigured server
       errorHtml =
@@ -1197,7 +1169,21 @@ async function exportZip() {
   a.download = `kobo_bulk_${idString}_${rows.length}rows.zip`;
   a.click();
 
-  const uploadUrl = `https://kc-eu.kobotoolbox.org/${username}/bulk-submission-form`;
+  // Derive the KC (KoboCat) subdomain from the selected KF server.
+  // eu.kobotoolbox.org      -> kc-eu.kobotoolbox.org
+  // kf.kobotoolbox.org      -> kc.kobotoolbox.org
+  // kobo.humanitarianresponse.info -> kc.humanitarianresponse.info
+  // custom/Worker URLs      -> fall back to eu (most common) with a note
+  const koboServer = getKoboServer();
+  let kcHost;
+  if (koboServer.includes('eu.kobotoolbox.org')) {
+    kcHost = 'kc-eu.kobotoolbox.org';
+  } else if (koboServer.includes('kf.kobotoolbox.org')) {
+    kcHost = 'kc.kobotoolbox.org';
+  } else { // kobo.humanitarianresponse.info
+    kcHost = 'kc.humanitarianresponse.info';
+  }
+  const uploadUrl = `https://${kcHost}/${username}/bulk-submission-form`;
   document.getElementById('csv-export-done').style.display = 'block';
   document.getElementById('zip-done-msg').innerHTML =
     `&#10003; <strong>ZIP exported (${rows.length} submissions).</strong><br><br>` +
@@ -1496,11 +1482,11 @@ function setOperation(op) {
   document.getElementById('guide-edit').style.display   = op === 'edit'   ? 'block' : 'none';
   document.getElementById('guide-perms').style.display  = op === 'perms'  ? 'block' : 'none';
   document.getElementById('guide-title').textContent    =
-    op === 'submit' ? 'Setup guide — ZIP needs no setup, Cloudflare Worker only for API tab'
+    op === 'submit' ? 'Setup guide — Cloudflare Worker required for connection'
     : op === 'edit' ? 'Setup guide — Cloudflare Worker required for edit operations'
     : 'Setup guide — Cloudflare Worker required for managing permissions';
   document.getElementById('guide-intro').textContent =
-    op === 'submit' ? 'The ZIP export works from any browser with no setup. The Cloudflare Worker is only needed for the Edit Existing Records and Manage Permissions operations.'
+    op === 'submit' ? 'KoboToolbox blocks direct browser requests for the connection test. A Cloudflare Worker proxy relays these requests — the ZIP export itself then runs entirely client-side.'
     : op === 'edit' ? 'Edit operations call the KoboToolbox API directly from your browser. A Cloudflare Worker proxy is required to relay these requests.'
     : 'Assigning permissions calls the KoboToolbox API directly from your browser. A Cloudflare Worker proxy is required to relay these requests.';
 
