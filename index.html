@@ -566,7 +566,7 @@ function resetConnStatus() {
   document.getElementById('badge-1').classList.remove('done');
   refreshSubmitBtn();
   // Re-build mapping if excel already loaded, to drop kobo suggestions
-  if (mainData.length) buildMapping();
+  if (mainData.length && currentOp !== 'perms') buildMapping();
 }
 
 function setConnUI(state, text, iconChar) {
@@ -730,7 +730,7 @@ async function testConnection() {
     refreshSubmitBtn();
 
     // Re-build mapping with kobo field names now available
-    if (mainData.length) buildMapping();
+    if (mainData.length && currentOp !== 'perms') buildMapping();
 
   } catch(e) {
     setConnUI('error', 'Connection failed');
@@ -852,8 +852,12 @@ function loadMainSheet() {
   const name = document.getElementById('main-sheet-select').value;
   mainData = XLSX.utils.sheet_to_json(workbook.Sheets[name], { defval: '' });
   showPreview(mainData);
-  buildMapping();
-  document.getElementById('sec-map').style.display = 'block';
+  if (currentOp !== 'perms') {
+    buildMapping();
+    document.getElementById('sec-map').style.display = 'block';
+  } else {
+    document.getElementById('sec-map').style.display = 'none';
+  }
 
   // Update all "To row" inputs with actual row count
   const count = mainData.length;
@@ -1463,7 +1467,12 @@ function setOperation(op) {
   document.getElementById('edit-upload-hint').style.display= op === 'edit'   ? 'block' : 'none';
 
   // Column mapping section: full grid for submit/edit, hidden+replaced for perms
-  document.getElementById('sec-map').style.display = op === 'perms' ? 'none' : 'block';
+  if (op === 'perms') {
+    document.getElementById('sec-map').style.display = 'none';
+  } else {
+    document.getElementById('sec-map').style.display = 'block';
+    if (mainData.length) buildMapping();
+  }
 
   // Step numbering — sections shift depending on operation:
   //   submit: 1=op, 2=guide/conn(3), 4=survey, 5=upload, 6=map, 7=action
