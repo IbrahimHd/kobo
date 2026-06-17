@@ -3,189 +3,219 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kobo Bulk Permissions Tool</title>
+<title>Kobo Bulk Permissions</title>
 
 <style>
-body{
-    font-family: Arial, sans-serif;
-    max-width: 900px;
-    margin: 30px auto;
+body {
+    font-family: system-ui, Arial;
+    background: #f5f7fb;
+    margin: 0;
+    color: #111827;
+}
+
+.container {
+    max-width: 850px;
+    margin: 40px auto;
     padding: 20px;
 }
-label{
-    display:block;
-    margin-top:12px;
-    font-weight:bold;
+
+h1 {
+    font-size: 22px;
+    margin-bottom: 20px;
 }
-input, select, textarea{
-    width:100%;
-    padding:8px;
-    box-sizing:border-box;
+
+.card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 15px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
-button{
-    margin-top:15px;
-    padding:10px 20px;
-    cursor:pointer;
+
+label {
+    font-size: 13px;
+    color: #374151;
+    display: block;
+    margin-top: 10px;
 }
-#log{
-    margin-top:20px;
-    padding:10px;
-    border:1px solid #ccc;
-    min-height:150px;
-    white-space:pre-wrap;
-    background:#fafafa;
+
+input, select {
+    width: 100%;
+    padding: 10px;
+    margin-top: 5px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    font-size: 14px;
+}
+
+input:focus, select:focus {
+    outline: none;
+    border-color: #3b82f6;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.dropzone {
+    border: 2px dashed #cbd5e1;
+    padding: 18px;
+    text-align: center;
+    border-radius: 10px;
+    margin-top: 10px;
+    cursor: pointer;
+    background: #fafafa;
+}
+
+button {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 10px;
+    background: #2563eb;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+button:hover {
+    background: #1d4ed8;
+}
+
+.log {
+    font-size: 12px;
+    white-space: pre-wrap;
+    max-height: 220px;
+    overflow: auto;
+    background: #0b1020;
+    color: #d1d5db;
+    padding: 10px;
+    border-radius: 10px;
 }
 </style>
 </head>
+
 <body>
 
-<h2>KoboToolbox Bulk User Permissions</h2>
+<div class="container">
 
-<label>Server URL</label>
-<input
-    id="server"
-    value="https://eu.kobotoolbox.org"
-    placeholder="https://eu.kobotoolbox.org">
+<h1>📊 Kobo Bulk Permissions Manager</h1>
 
-<label>API Token</label>
-<input
-    id="token"
-    type="password"
-    placeholder="Paste Kobo API Token">
+<div class="card">
 
-<label>Form / Asset UID</label>
-<input
-    id="assetUid"
-    placeholder="e.g. aWKJiwMPNGesLfzxdL7dCM">
+<label>Cloudflare Worker URL</label>
+<input id="worker" placeholder="https://your-worker.workers.dev">
 
-<label>Permission</label>
+<div class="row">
+<div>
+<label>Server</label>
+<select id="server">
+    <option value="https://eu.kobotoolbox.org">EU Server</option>
+    <option value="https://kf.kobotoolbox.org">Global Server</option>
+</select>
+</div>
+
+<div>
+<label>Permission Type</label>
 <select id="permission">
     <option value="add_submissions">Add submissions</option>
     <option value="view_submissions">View submissions</option>
     <option value="change_asset">Edit form</option>
     <option value="validate_submissions">Validate submissions</option>
+    <option value="manage_asset">Manage project</option>
 </select>
+</div>
+</div>
 
-<label>CSV File</label>
-<input id="csvFile" type="file" accept=".csv">
+<label>API Token</label>
+<input id="token" type="password" placeholder="Kobo API Token">
 
-<p>
-CSV must contain a column named:
-<b>username</b>
-</p>
+<label>Asset UID</label>
+<input id="asset">
 
-<button onclick="uploadPermissions()">
-Assign Permissions
-</button>
+<div class="dropzone" onclick="file.click()">
+Drop CSV or click here
+<input type="file" id="file" accept=".csv" hidden>
+</div>
 
-<div id="log"></div>
+<button onclick="run()">Run Bulk Assignment</button>
+
+</div>
+
+<div class="card">
+<pre class="log" id="log"></pre>
+</div>
+
+</div>
 
 <script>
 
-function log(msg){
-    document.getElementById('log').textContent += msg + '\n';
-}
+const log = (m) =>
+  document.getElementById("log").textContent += m + "\n";
+
+const file = document.getElementById("file");
 
 function parseCSV(text){
+    const lines = text.trim().split("\n");
+    const headers = lines[0].split(",");
+    const idx = headers.findIndex(h => h.trim().toLowerCase() === "username");
 
-    const rows = text.trim().split(/\r?\n/);
-    const headers = rows[0].split(',');
+    if(idx === -1) throw new Error("CSV must contain 'username' column");
 
-    const usernameIndex =
-        headers.findIndex(h =>
-            h.trim().toLowerCase() === 'username');
-
-    if(usernameIndex === -1){
-        throw new Error(
-            'CSV must contain a username column'
-        );
-    }
-
-    const users = [];
-
-    for(let i=1;i<rows.length;i++){
-
-        const cols = rows[i].split(',');
-
-        const username =
-            cols[usernameIndex]?.trim();
-
-        if(username){
-            users.push(username);
-        }
-    }
-
-    return users;
+    return lines.slice(1)
+        .map(l => l.split(",")[idx]?.trim())
+        .filter(Boolean);
 }
 
-async function uploadPermissions(){
+async function run(){
 
-    document.getElementById('log').textContent='';
+    document.getElementById("log").textContent = "";
 
-    try{
+    const worker = document.getElementById("worker").value;
+    const server = document.getElementById("server").value;
+    const token = document.getElementById("token").value;
+    const asset = document.getElementById("asset").value;
+    const permission = document.getElementById("permission").value;
+    const fileObj = file.files[0];
 
-        const server =
-            document.getElementById('server').value.replace(/\/$/,'');
-
-        const token =
-            document.getElementById('token').value.trim();
-
-        const assetUid =
-            document.getElementById('assetUid').value.trim();
-
-        const permissionCode =
-            document.getElementById('permission').value;
-
-        const file =
-            document.getElementById('csvFile').files[0];
-
-        if(!token || !assetUid || !file){
-            throw new Error(
-                'Token, Asset UID and CSV are required.'
-            );
-        }
-
-        const csvText = await file.text();
-
-        const usernames = parseCSV(csvText);
-
-        log(`Found ${usernames.length} usernames`);
-
-        const permissionUrl =
-            `${server}/api/v2/permissions/${permissionCode}/`;
-
-        const payload = usernames.map(username => ({
-            user: `${server}/api/v2/users/${username}/`,
-            permission: permissionUrl
-        }));
-
-        log('Sending request...');
-
-        const response = await fetch(
-            `${server}/api/v2/assets/${assetUid}/permission-assignments/bulk/`,
-            {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Token ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(payload)
-            }
-        );
-
-        const result = await response.text();
-
-        if(response.ok){
-            log('SUCCESS');
-            log(result);
-        }else{
-            log('FAILED');
-            log(result);
-        }
-
-    }catch(err){
-        log('ERROR: ' + err.message);
+    if(!worker || !token || !asset || !fileObj){
+        return log("Missing required fields.");
     }
+
+    const users = parseCSV(await fileObj.text());
+    log("Users found: " + users.length);
+
+    const assignments = users.map(u => ({
+        user: `${server}/api/v2/users/${u}/`,
+        permission: `${server}/api/v2/permissions/${permission}/`
+    }));
+
+    log("Sending request...");
+
+    const res = await fetch(worker, {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({
+            server,
+            token,
+            assetUid: asset,
+            assignments
+        })
+    });
+
+    const data = await res.json();
+
+    if(data.ok){
+        log("SUCCESS (" + data.status + ")");
+    } else {
+        log("FAILED (" + data.status + ")");
+    }
+
+    log(JSON.stringify(data.response || data.error, null, 2));
 }
 
 </script>
