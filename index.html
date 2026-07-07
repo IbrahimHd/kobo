@@ -403,10 +403,10 @@
         </div>
         <div class="field-row">
           <label>Delay (ms)</label>
-          <input type="range" min="0" max="2000" step="100" value="300" id="delay-slider-edit" oninput="document.getElementById('delay-val-edit').textContent=this.value+'ms'" style="flex:1" />
-          <span style="font-size:13px;min-width:48px;text-align:right" id="delay-val-edit">300ms</span>
+          <input type="range" min="0" max="2000" step="100" value="200" id="delay-slider-edit" oninput="document.getElementById('delay-val-edit').textContent=this.value+'ms'" style="flex:1" />
+          <span style="font-size:13px;min-width:48px;text-align:right" id="delay-val-edit">200ms</span>
         </div>
-        <p class="hint" style="margin-bottom:1rem">&#9432; One PATCH request is sent per mapped field. Each request updates all rows at once.</p>
+        <p class="hint" style="margin-bottom:1rem">&#9432; Processes one row at a time — all mapped fields updated per row before moving to the next. Delay applies between rows.</p>
         <button class="btn-primary teal" id="edit-btn" onclick="startEdits()" disabled>
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           Apply edits
@@ -1668,7 +1668,8 @@ async function startEdits() {
     rows = rows.slice(from, to);
   }
 
-  const delay = parseInt(document.getElementById('delay-slider-edit').value)||300;
+
+  const delay = parseInt(document.getElementById('delay-slider-edit').value)||200;
 
   // ── Pre-flight: validate all mapped field names against a real submission ──
   // Fetch one submission to get the actual field keys before touching any data.
@@ -1724,76 +1725,64 @@ async function startEdits() {
   document.getElementById('sec-results').style.display = 'block';
   document.getElementById('log-wrap').innerHTML = '';
   document.getElementById('retry-btn').style.display = 'none';
-  updateStats(0, 0, 0, mappedFields.length);
+  updateStats(0, 0, 0, rows.length);
   document.getElementById('edit-btn').disabled = true;
   document.getElementById('edit-btn').innerHTML = '&#9654; Applying edits…';
   document.getElementById('ctrl-row-edit').style.display = 'flex';
 
   const url = `${serverUrl}/api/v2/assets/${formUid}/data/bulk/`;
-  const CHUNK_SIZE = 200; // max IDs per PATCH request — keeps server response times safe
   let ok = 0, err = 0;
 
-  // One PATCH per field — chunked to avoid server timeouts on large datasets
-  for (let fi = 0; fi < mappedFields.length; fi++) {
+  // Process row by row — all mapped fields for each row updated before moving to next.
+  // Uses bulk endpoint with single submission ID per request (one per field per row).
+  for (let ri = 0; ri < rows.length; ri++) {
     if (editCancelled) break;
     while (editPaused && !editCancelled) await sleep(200);
     if (editCancelled) break;
 
-    const { col, field } = mappedFields[fi];
-    // Group rows by value — each unique value needs its own PATCH payload
-    const valueGroups = {};
-    rows.forEach(row => {
-      const id  = row[idCol];
-      const val = isExcelDateSerial(row[col]) ? excelDateToISO(row[col]) : String(row[col] ?? '');
-      if (!id) return;
-      if (!valueGroups[val]) valueGroups[val] = [];
-      valueGroups[val].push(Number(id));
-    });
-
-    // Split each value group into chunks of CHUNK_SIZE
-    const chunks = []; // [{val, ids}]
-    for (const [val, ids] of Object.entries(valueGroups)) {
-      for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
-        chunks.push({ val, ids: ids.slice(i, i + CHUNK_SIZE) });
-      }
+    const row = rows[ri];
+    const submissionId = Number(row[idCol]);
+    if (!submissionId) {
+      addLog(ri+1, 'err', `Row ${ri+1}: missing _id — skipped`);
+      logEntries.push({row:ri+1, status:'error', message:'missing _id'});
+      err++; updateStats(ri+1, ok, err, rows.length); continue;
     }
-    const totalChunks = chunks.length;
 
-    let fieldOk = true;
+    let rowOk = true;
+    const failedFields = [];
 
-    for (let ci = 0; ci < totalChunks; ci++) {
+    // Update all mapped fields for this row
+    for (const { col, field } of mappedFields) {
       if (editCancelled) break;
-      while (editPaused && !editCancelled) await sleep(200);
-      if (editCancelled) break;
-
-      const { val, ids } = chunks[ci];
+      const val = isExcelDateSerial(row[col]) ? excelDateToISO(row[col]) : String(row[col] ?? '');
       try {
         const resp = await fetch(url, {
           method: 'PATCH',
           headers: { 'Authorization': 'Token '+token, 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({ payload: { submission_ids: ids, data: { [field]: val } } })
+          body: JSON.stringify({ payload: { submission_ids: [submissionId], data: { [field]: val } } })
         });
         if (!resp.ok) {
           const j = await resp.json().catch(() => ({}));
           throw new Error(j.detail || resp.status+' '+resp.statusText);
         }
-
       } catch(e) {
-        fieldOk = false; err++;
-        addLog(fi+1, 'err', `${field}: ${e.message}`);
-        logEntries.push({row:fi+1, status:'error', message:`${field}${chunkLabel}: ${e.message}`});
-        break;
+        rowOk = false;
+        failedFields.push(`${field}: ${e.message}`);
       }
-      if (ci < totalChunks - 1 && !editCancelled) await sleep(delay);
     }
-    if (fieldOk) {
+
+    if (rowOk) {
       ok++;
-      const chunkInfo = totalChunks > 1 ? ` (${totalChunks} chunks)` : '';
-      addLog(fi+1, 'ok', `${field} — ${rows.length} row(s) updated${chunkInfo}`);
-      logEntries.push({row:fi+1, status:'ok', message:`${field} updated (${rows.length} rows)`});
+      addLog(ri+1, 'ok', `Row ${ri+1} — ID ${submissionId} updated (${mappedFields.length} field${mappedFields.length !== 1 ? 's' : ''})`);
+      logEntries.push({row:ri+1, status:'ok', message:`ID ${submissionId} updated`});
+    } else {
+      err++;
+      addLog(ri+1, 'err', `Row ${ri+1} — ID ${submissionId}: ${failedFields.join('; ')}`);
+      logEntries.push({row:ri+1, status:'error', message:`ID ${submissionId}: ${failedFields.join('; ')}`});
+      failedRows.push(row);
     }
-    updateStats(fi+1, ok, err, mappedFields.length);
-    if (fi < mappedFields.length-1 && !editCancelled) await sleep(delay);
+    updateStats(ri+1, ok, err, rows.length);
+    if (ri < rows.length-1 && !editCancelled) await sleep(delay);
   }
 
   editRunning = false;
