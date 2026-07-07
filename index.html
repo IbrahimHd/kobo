@@ -1730,17 +1730,28 @@ async function startEdits() {
           const j = await resp.json().catch(() => ({}));
           throw new Error(j.detail || resp.status+' '+resp.statusText);
         }
-        // Validate field name exists in response (only needed once per field)
-        if (!validatedField) {
-          const j = await resp.json().catch(() => null);
-          if (j && j.results && Array.isArray(j.results) && j.results.length > 0) {
-            if (!(field in j.results[0])) {
-              silentFail = true; fieldOk = false; err++;
-              addLog(fi+1, 'err', `${field}: field not found in form — check name or group prefix`);
-              logEntries.push({row:fi+1, status:'error', message:`${field}: field not found in response`});
-              break;
+        // Validate field name by fetching one submission and checking its keys.
+        // More reliable than parsing the PATCH response, which has undocumented structure.
+        if (!validatedField && ids.length > 0) {
+          try {
+            const checkUrl = `${serverUrl}/api/v2/assets/${formUid}/data/${ids[0]}/?format=json`;
+            const checkResp = await fetch(checkUrl, {
+              headers: { 'Authorization': 'Token '+token, 'Accept': 'application/json' }
+            });
+            if (checkResp.ok) {
+              const submission = await checkResp.json();
+              const keys = Object.keys(submission);
+              const leafName = field.includes('/') ? field.split('/').pop() : field;
+              const found = (field in submission) ||
+                            keys.some(k => k === field || k.endsWith('/' + leafName));
+              if (!found) {
+                silentFail = true; fieldOk = false; err++;
+                addLog(fi+1, 'err', `${field}: field not found in form — check name or group prefix`);
+                logEntries.push({row:fi+1, status:'error', message:`${field}: field not found`});
+                break;
+              }
             }
-          }
+          } catch(e) { /* verification failed silently — trust the 200 */ }
           validatedField = true;
         }
         if (totalChunks > 1) addLog(fi+1, 'ok', `${field}${chunkLabel} — ${ids.length} rows`);
