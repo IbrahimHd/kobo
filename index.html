@@ -1669,6 +1669,56 @@ async function startEdits() {
   }
 
   const delay = parseInt(document.getElementById('delay-slider-edit').value)||300;
+
+  // ── Pre-flight: validate all mapped field names against a real submission ──
+  // Fetch one submission to get the actual field keys before touching any data.
+  const firstId = rows.find(r => r[idCol])?.[idCol];
+  if (firstId) {
+    document.getElementById('edit-btn').disabled = true;
+    document.getElementById('edit-btn').innerHTML = '&#9654; Validating fields…';
+    try {
+      const checkUrl = `${serverUrl}/api/v2/assets/${formUid}/data/${firstId}/?format=json`;
+      const checkResp = await fetch(checkUrl, {
+        headers: { 'Authorization': 'Token '+token, 'Accept': 'application/json' }
+      });
+      if (checkResp.ok) {
+        const submission = await checkResp.json();
+        const submissionKeys = Object.keys(submission);
+
+        const invalidFields = mappedFields.filter(({ field }) => {
+          const leafName = field.includes('/') ? field.split('/').pop() : field;
+          return !(field in submission) &&
+                 !submissionKeys.some(k => k === field || k.endsWith('/' + leafName));
+        });
+
+        if (invalidFields.length > 0) {
+          document.getElementById('edit-btn').disabled = false;
+          document.getElementById('edit-btn').innerHTML =
+            '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Apply edits';
+
+          const fieldList = invalidFields.map(f => `• ${f.field}`).join('\n');
+          const proceed = confirm(
+            `⚠️ The following mapped field(s) were not found in this form:\n\n${fieldList}\n\n` +
+            `These fields will be silently ignored by KoboToolbox.\n\n` +
+            `Do you want to proceed anyway with the remaining valid fields?`
+          );
+          if (!proceed) return;
+
+          // Remove invalid fields from mappedFields before proceeding
+          mappedFields.splice(0, mappedFields.length,
+            ...mappedFields.filter(f => !invalidFields.includes(f))
+          );
+          if (!mappedFields.length) {
+            alert('No valid fields remain to edit. Operation cancelled.');
+            return;
+          }
+        }
+      }
+    } catch(e) { /* pre-flight failed — proceed anyway and let per-field errors surface */ }
+    document.getElementById('edit-btn').disabled = false;
+  }
+  // ── End pre-flight ────────────────────────────────────────────
+
   logEntries = []; failedRows = []; editCancelled = false; editPaused = false;
   editRunning = true;
   document.getElementById('sec-results').style.display = 'block';
@@ -1710,8 +1760,6 @@ async function startEdits() {
     const totalChunks = chunks.length;
 
     let fieldOk = true;
-    let silentFail = false;
-    let validatedField = false;
 
     for (let ci = 0; ci < totalChunks; ci++) {
       if (editCancelled) break;
@@ -1719,7 +1767,6 @@ async function startEdits() {
       if (editCancelled) break;
 
       const { val, ids } = chunks[ci];
-      const chunkLabel = totalChunks > 1 ? ` (chunk ${ci+1}/${totalChunks})` : '';
       try {
         const resp = await fetch(url, {
           method: 'PATCH',
@@ -1730,34 +1777,10 @@ async function startEdits() {
           const j = await resp.json().catch(() => ({}));
           throw new Error(j.detail || resp.status+' '+resp.statusText);
         }
-        // Validate field name by fetching one submission and checking its keys.
-        // More reliable than parsing the PATCH response, which has undocumented structure.
-        if (!validatedField && ids.length > 0) {
-          try {
-            const checkUrl = `${serverUrl}/api/v2/assets/${formUid}/data/${ids[0]}/?format=json`;
-            const checkResp = await fetch(checkUrl, {
-              headers: { 'Authorization': 'Token '+token, 'Accept': 'application/json' }
-            });
-            if (checkResp.ok) {
-              const submission = await checkResp.json();
-              const keys = Object.keys(submission);
-              const leafName = field.includes('/') ? field.split('/').pop() : field;
-              const found = (field in submission) ||
-                            keys.some(k => k === field || k.endsWith('/' + leafName));
-              if (!found) {
-                silentFail = true; fieldOk = false; err++;
-                addLog(fi+1, 'err', `${field}: field not found in form — check name or group prefix`);
-                logEntries.push({row:fi+1, status:'error', message:`${field}: field not found`});
-                break;
-              }
-            }
-          } catch(e) { /* verification failed silently — trust the 200 */ }
-          validatedField = true;
-        }
-        if (totalChunks > 1) addLog(fi+1, 'ok', `${field}${chunkLabel} — ${ids.length} rows`);
+
       } catch(e) {
         fieldOk = false; err++;
-        addLog(fi+1, 'err', `${field}${chunkLabel}: ${e.message}`);
+        addLog(fi+1, 'err', `${field}: ${e.message}`);
         logEntries.push({row:fi+1, status:'error', message:`${field}${chunkLabel}: ${e.message}`});
         break;
       }
