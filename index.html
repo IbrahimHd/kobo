@@ -391,8 +391,29 @@
       <div id="action-edit" style="display:none">
         <div class="info-box info" style="margin-bottom:1rem">
           &#9432; Uses <code style="font-size:11px;background:#e8f1fb;padding:1px 5px;border-radius:4px">PATCH /api/v2/assets/{uid}/data/bulk/</code> to update existing submissions.
-          Your Excel must include a <strong>_id</strong> column. One PATCH is fired per field column, updating all matched rows simultaneously.
+          Your Excel must include a <strong>_id</strong> column.
         </div>
+
+        <!-- Edit mode selector -->
+        <div class="field-row" style="margin-bottom:.5rem">
+          <label>Edit mode</label>
+          <select id="edit-mode" onchange="onEditModeChange()">
+            <option value="one" selected>One by one</option>
+            <option value="batch">Batches</option>
+          </select>
+        </div>
+        <div id="edit-mode-hint-one" class="hint" style="margin-bottom:.75rem">
+          &#9432; Best tracking — each row is logged individually. Failed rows can be retried precisely.
+        </div>
+        <div id="edit-mode-hint-batch" style="display:none" class="hint" style="margin-bottom:.75rem">
+          &#9432; Faster — rows are grouped into batches per field. Harder to track which specific records failed within a batch.
+        </div>
+        <div id="edit-batch-size-row" class="field-row" style="display:none;margin-bottom:.75rem">
+          <label>Batch size</label>
+          <input type="number" id="edit-batch-size" value="10" min="1" max="500" style="width:80px;flex:none" />
+          <span style="font-size:12px;color:#aaa;margin-left:8px">rows per request</span>
+        </div>
+
         <div class="field-row">
           <label>Rows to edit</label>
           <select id="row-range-edit"><option value="all">All rows</option><option value="range">Custom range…</option></select>
@@ -406,7 +427,6 @@
           <input type="range" min="0" max="2000" step="100" value="200" id="delay-slider-edit" oninput="document.getElementById('delay-val-edit').textContent=this.value+'ms'" style="flex:1" />
           <span style="font-size:13px;min-width:48px;text-align:right" id="delay-val-edit">200ms</span>
         </div>
-        <p class="hint" style="margin-bottom:1rem">&#9432; Processes one row at a time — all mapped fields updated per row before moving to the next. Delay applies between rows.</p>
         <button class="btn-primary teal" id="edit-btn" onclick="startEdits()" disabled>
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           Apply edits
@@ -1605,6 +1625,14 @@ function setOperation(op) {
 document.addEventListener('DOMContentLoaded', () => {
 });
 
+// ── Edit mode toggle ──────────────────────────────────────────
+function onEditModeChange() {
+  const mode = document.getElementById('edit-mode').value;
+  document.getElementById('edit-mode-hint-one').style.display   = mode === 'one'   ? 'block' : 'none';
+  document.getElementById('edit-mode-hint-batch').style.display = mode === 'batch' ? 'block' : 'none';
+  document.getElementById('edit-batch-size-row').style.display  = mode === 'batch' ? 'flex'  : 'none';
+}
+
 // ── Bulk Edit via PATCH /data/bulk/ ───────────────────────────
 let editRunning = false, editPaused = false, editCancelled = false;
 
@@ -1731,58 +1759,107 @@ async function startEdits() {
   document.getElementById('ctrl-row-edit').style.display = 'flex';
 
   const url = `${serverUrl}/api/v2/assets/${formUid}/data/bulk/`;
+  const editMode  = document.getElementById('edit-mode').value;
+  const batchSize = Math.max(1, parseInt(document.getElementById('edit-batch-size').value) || 10);
   let ok = 0, err = 0;
 
-  // Process row by row — all mapped fields for each row updated before moving to next.
-  // Uses bulk endpoint with single submission ID per request (one per field per row).
-  for (let ri = 0; ri < rows.length; ri++) {
-    if (editCancelled) break;
-    while (editPaused && !editCancelled) await sleep(200);
-    if (editCancelled) break;
+  if (editMode === 'one') {
+    // ── One-by-one mode: one row at a time, all fields per row ──
+    for (let ri = 0; ri < rows.length; ri++) {
+      if (editCancelled) break;
+      while (editPaused && !editCancelled) await sleep(200);
+      if (editCancelled) break;
 
-    const row = rows[ri];
-    const submissionId = Number(row[idCol]);
-    if (!submissionId) {
-      addLog(ri+1, 'err', `Row ${ri+1}: missing _id — skipped`);
-      logEntries.push({row:ri+1, status:'error', message:'missing _id'});
-      err++; updateStats(ri+1, ok, err, rows.length); continue;
+      const row = rows[ri];
+      const submissionId = Number(row[idCol]);
+      if (!submissionId) {
+        addLog(ri+1, 'err', `Row ${ri+1}: missing _id — skipped`);
+        logEntries.push({row:ri+1, status:'error', message:'missing _id'});
+        err++; updateStats(ri+1, ok, err, rows.length); continue;
+      }
+
+      let rowOk = true;
+      const failedFields = [];
+
+      for (const { col, field } of mappedFields) {
+        if (editCancelled) break;
+        const val = isExcelDateSerial(row[col]) ? excelDateToISO(row[col]) : String(row[col] ?? '');
+        try {
+          const resp = await fetch(url, {
+            method: 'PATCH',
+            headers: { 'Authorization': 'Token '+token, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ payload: { submission_ids: [submissionId], data: { [field]: val } } })
+          });
+          if (!resp.ok) { const j = await resp.json().catch(()=>({})); throw new Error(j.detail || resp.status); }
+        } catch(e) { rowOk = false; failedFields.push(`${field}: ${e.message}`); }
+      }
+
+      if (rowOk) {
+        ok++;
+        addLog(ri+1, 'ok', `Row ${ri+1} — ID ${submissionId} (${mappedFields.length} field${mappedFields.length!==1?'s':''})`);
+        logEntries.push({row:ri+1, status:'ok', message:`ID ${submissionId} updated`});
+      } else {
+        err++;
+        addLog(ri+1, 'err', `Row ${ri+1} — ID ${submissionId}: ${failedFields.join('; ')}`);
+        logEntries.push({row:ri+1, status:'error', message:`ID ${submissionId}: ${failedFields.join('; ')}`});
+        failedRows.push(row);
+      }
+      updateStats(ri+1, ok, err, rows.length);
+      if (ri < rows.length-1 && !editCancelled) await sleep(delay);
     }
 
-    let rowOk = true;
-    const failedFields = [];
+  } else {
+    // ── Batch mode: chunks of rows per field ──────────────────
+    const totalBatches = Math.ceil(rows.length / batchSize);
+    const totalOps = mappedFields.length * totalBatches;
+    let opsDone = 0;
 
-    // Update all mapped fields for this row
     for (const { col, field } of mappedFields) {
       if (editCancelled) break;
-      const val = isExcelDateSerial(row[col]) ? excelDateToISO(row[col]) : String(row[col] ?? '');
-      try {
-        const resp = await fetch(url, {
-          method: 'PATCH',
-          headers: { 'Authorization': 'Token '+token, 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({ payload: { submission_ids: [submissionId], data: { [field]: val } } })
+
+      for (let bi = 0; bi < totalBatches; bi++) {
+        if (editCancelled) break;
+        while (editPaused && !editCancelled) await sleep(200);
+        if (editCancelled) break;
+
+        const batchRows = rows.slice(bi * batchSize, (bi + 1) * batchSize);
+        // Group this batch by value
+        const valueGroups = {};
+        batchRows.forEach(row => {
+          const id  = row[idCol];
+          const val = isExcelDateSerial(row[col]) ? excelDateToISO(row[col]) : String(row[col] ?? '');
+          if (!id) return;
+          if (!valueGroups[val]) valueGroups[val] = [];
+          valueGroups[val].push(Number(id));
         });
-        if (!resp.ok) {
-          const j = await resp.json().catch(() => ({}));
-          throw new Error(j.detail || resp.status+' '+resp.statusText);
+
+        const batchStart = bi * batchSize + 1;
+        const batchEnd   = Math.min((bi + 1) * batchSize, rows.length);
+
+        try {
+          for (const [val, ids] of Object.entries(valueGroups)) {
+            if (editCancelled) break;
+            const resp = await fetch(url, {
+              method: 'PATCH',
+              headers: { 'Authorization': 'Token '+token, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+              body: JSON.stringify({ payload: { submission_ids: ids, data: { [field]: val } } })
+            });
+            if (!resp.ok) { const j = await resp.json().catch(()=>({})); throw new Error(j.detail || resp.status); }
+          }
+          ok++;
+          addLog(opsDone+1, 'ok', `${field} — rows ${batchStart}–${batchEnd} (batch ${bi+1}/${totalBatches})`);
+          logEntries.push({row:opsDone+1, status:'ok', message:`${field} rows ${batchStart}–${batchEnd}`});
+        } catch(e) {
+          err++;
+          addLog(opsDone+1, 'err', `${field} — rows ${batchStart}–${batchEnd}: ${e.message}`);
+          logEntries.push({row:opsDone+1, status:'error', message:`${field} rows ${batchStart}–${batchEnd}: ${e.message}`});
+          failedRows.push(...batchRows);
         }
-      } catch(e) {
-        rowOk = false;
-        failedFields.push(`${field}: ${e.message}`);
+        opsDone++;
+        updateStats(opsDone, ok, err, totalOps);
+        if (!editCancelled) await sleep(delay);
       }
     }
-
-    if (rowOk) {
-      ok++;
-      addLog(ri+1, 'ok', `Row ${ri+1} — ID ${submissionId} updated (${mappedFields.length} field${mappedFields.length !== 1 ? 's' : ''})`);
-      logEntries.push({row:ri+1, status:'ok', message:`ID ${submissionId} updated`});
-    } else {
-      err++;
-      addLog(ri+1, 'err', `Row ${ri+1} — ID ${submissionId}: ${failedFields.join('; ')}`);
-      logEntries.push({row:ri+1, status:'error', message:`ID ${submissionId}: ${failedFields.join('; ')}`});
-      failedRows.push(row);
-    }
-    updateStats(ri+1, ok, err, rows.length);
-    if (ri < rows.length-1 && !editCancelled) await sleep(delay);
   }
 
   editRunning = false;
