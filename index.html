@@ -736,15 +736,31 @@ async function testConnection() {
     }
 
     const survey = (asset.content && asset.content.survey) ? asset.content.survey : [];
+    const groupStack = []; // tracks nested group names for fully-qualified field paths
     survey.forEach(field => {
       const name = field.name || field.$autoname;
       const type = String(field.type || '').trim().toLowerCase();
       if (!name) return;
-      if (type === 'note') { koboNoteFields.push(name); return; }
+
+      // Maintain group context stack
+      if (type === 'begin_group' || type === 'begin_repeat') {
+        groupStack.push(name); return;
+      }
+      if (type === 'end_group' || type === 'end_repeat') {
+        groupStack.pop(); return;
+      }
+
+      // Build fully-qualified name: group/subgroup/field_name
+      const qualifiedName = groupStack.length > 0
+        ? groupStack.join('/') + '/' + name
+        : name;
+
+      if (type === 'note') { koboNoteFields.push(qualifiedName); return; }
+
       const excludedTypes = ['begin_score', 'end_score', 'begin_rank', 'end_rank'];
-      if (!type.startsWith('begin_') && !type.startsWith('end_') && !excludedTypes.includes(type)) {
+      if (!excludedTypes.includes(type)) {
         const label = (field.label && field.label[0]) ? field.label[0] : name;
-        koboFields.push({ name, label, type });
+        koboFields.push({ name: qualifiedName, label, type });
       }
     });
 
