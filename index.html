@@ -105,7 +105,13 @@
   .btn-pause:hover { background: #f5ddb8; }
   .btn-cancel { flex: 1; padding: 10px; background: #FCEBEB; color: #A32D2D; border: 1px solid #E24B4A; border-radius: 9px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; transition: background .15s; }
   .btn-cancel:hover { background: #f8d4d4; }
-  .form-meta { font-size: 12px; color: #555; margin-top: 8px; padding: 8px 12px; background: #f5f4f0; border-radius: 8px; display: flex; gap: 16px; flex-wrap: wrap; }
+  .form-list-item { padding: 9px 12px; font-size: 13px; cursor: pointer; border-bottom: 1px solid #f0ede6; display: flex; flex-direction: column; gap: 2px; transition: background .1s; }
+  .form-list-item:last-child { border-bottom: none; }
+  .form-list-item:hover { background: #EBF4FC; }
+  .form-list-item.selected { background: #EBF4FC; border-left: 3px solid #185FA5; }
+  .form-list-item .form-name { font-weight: 600; color: #1a1a1a; }
+  .form-list-item .form-uid { font-size: 11px; color: #aaa; font-family: monospace; }
+  .form-list-empty { padding: 1rem; text-align: center; font-size: 13px; color: #aaa; }
   .form-meta span { color: #888; }
   optgroup { font-weight: 600; font-style: normal; color: #555; }
   .preview-table-wrap { overflow-x: auto; font-size: 11px; border: 1px solid #e4e2dc; border-radius: 8px; }
@@ -241,6 +247,8 @@
     <!-- Step 3: Connection -->
     <div class="card" id="card-conn">
       <div class="card-title"><span class="step-badge" id="badge-conn">3</span> KoboToolbox connection</div>
+
+      <!-- Step 3a: Credentials + Connect -->
       <div class="field-row">
         <label>API Token</label>
         <input type="password" id="api-token" placeholder="Paste your API token…" oninput="resetConnStatus()" />
@@ -257,20 +265,30 @@
         <label>Cloudflare Proxy</label>
         <input type="text" id="custom-url" placeholder="https://your-proxy.workers.dev" value="https://kobo.hammadibrahim.workers.dev" oninput="resetConnStatus()" />
       </div>
-      <div class="field-row">
-        <label>Form UID</label>
-        <input type="text" id="form-uid" placeholder="e.g. aXmKz7p9Qn…" oninput="resetConnStatus()" />
-      </div>
-      <p class="hint" style="margin-bottom:.85rem">&#9432; Find the Form UID in your form's URL: /forms/<strong>UID</strong>/</p>
-      <div class="connect-row">
-        <button class="btn-connect" id="btn-connect" onclick="testConnection()">
+      <div class="connect-row" style="margin-bottom:.85rem">
+        <button class="btn-connect" id="btn-connect" onclick="connectAndLoadForms()">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0114.08 0"/><path d="M1.42 9a16 16 0 0121.16 0"/><path d="M8.53 16.11a6 6 0 016.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/></svg>
           Connect
         </button>
         <div class="conn-status idle" id="conn-status"><span id="conn-status-text">Not connected yet</span></div>
       </div>
       <div id="conn-info-box" style="display:none"></div>
-      <div id="form-meta" style="display:none" class="form-meta"></div>
+
+      <!-- Step 3b: Form selector (shown after successful connect) -->
+      <div id="form-selector" style="display:none">
+        <div class="field-row" style="margin-top:.5rem">
+          <label>Form</label>
+          <div style="flex:1;position:relative">
+            <input type="text" id="form-search" placeholder="Search forms by name…" oninput="filterForms()" autocomplete="off"
+              style="width:100%;padding-right:32px" />
+            <span id="form-search-clear" onclick="clearFormSearch()"
+              style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;color:#aaa;font-size:16px;line-height:1">&#10005;</span>
+          </div>
+        </div>
+        <div id="form-list" style="border:1px solid #e4e2dc;border-radius:8px;max-height:220px;overflow-y:auto;margin-bottom:.75rem"></div>
+        <input type="hidden" id="form-uid" />
+        <div id="form-meta" style="display:none" class="form-meta"></div>
+      </div>
     </div>
 
     <!-- Step 4: Survey structure (submissions only) -->
@@ -495,6 +513,93 @@
 let workbook=null, mainData=[], mode='flat', logEntries=[], failedRows=[], allSheets=[], repeatSheetCount=0;
 let koboFields=[], koboNoteFields=[], connVerified=false, canSubmit=false, koboIdString='', koboVersion='', koboEnketoUrl='', koboFormUuid='';
 
+// ── Step 1: Connect + load forms list ─────────────────────────
+let allForms = [];
+
+async function connectAndLoadForms() {
+  const token  = document.getElementById('api-token').value.trim();
+  const server = getServerUrl();
+  if (!token)  { showInfoBox('error', 'Please enter your API token.'); return; }
+  if (!server) { showInfoBox('error', 'Please enter your Cloudflare Proxy URL.'); return; }
+
+  setConnUI('loading', 'Connecting…');
+  document.getElementById('form-selector').style.display = 'none';
+  document.getElementById('form-meta').style.display = 'none';
+  document.getElementById('form-uid').value = '';
+  connVerified = false;
+  koboFields = []; koboNoteFields = [];
+  allForms = [];
+  refreshSubmitBtn();
+
+  try {
+    const url = `${server}/api/v2/assets/?asset_type=survey&page_size=300&format=json`;
+    const resp = await fetch(url, {
+      headers: { 'Authorization': 'Token ' + token, 'Accept': 'application/json' }
+    });
+    if (resp.status === 401) throw new Error('Invalid or expired API token');
+    if (resp.status === 403) throw new Error('Permission denied — check your token');
+    if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
+
+    const data = await resp.json();
+    allForms = (data.results || []).map(f => ({
+      uid:    f.uid,
+      name:   f.name || f.uid,
+      status: f.deployment_status || ''
+    })).sort((a, b) => a.name.localeCompare(b.name));
+
+    if (!allForms.length) throw new Error('No forms found for this token');
+
+    setConnUI('success', `Connected — ${allForms.length} form${allForms.length !== 1 ? 's' : ''} found`);
+    document.getElementById('form-selector').style.display = 'block';
+    renderFormList(allForms);
+
+  } catch(e) {
+    setConnUI('error', e.message);
+    showInfoBox('error',
+      `✗ <strong>${e.message}</strong><br>` +
+      'See the <a href="#setup-guide" onclick="openSetupGuide()" style="color:#A32D2D;font-weight:600;text-decoration:underline">setup guide</a> if this is your first time.');
+  }
+}
+
+function renderFormList(forms) {
+  const list = document.getElementById('form-list');
+  if (!forms.length) {
+    list.innerHTML = '<div class="form-list-empty">No forms match your search</div>';
+    return;
+  }
+  const currentUid = document.getElementById('form-uid').value;
+  list.innerHTML = forms.map(f => {
+    const safeName = f.name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    return `<div class="form-list-item${f.uid === currentUid ? ' selected' : ''}" onclick="selectForm('${f.uid}','${safeName}')" data-uid="${f.uid}">
+      <span class="form-name">${escHtml(f.name)}</span>
+      <span class="form-uid">${f.uid}</span>
+    </div>`;
+  }).join('');
+}
+
+function filterForms() {
+  const q = document.getElementById('form-search').value.toLowerCase();
+  document.getElementById('form-search-clear').style.display = q ? 'inline' : 'none';
+  renderFormList(allForms.filter(f =>
+    f.name.toLowerCase().includes(q) || f.uid.toLowerCase().includes(q)
+  ));
+}
+
+function clearFormSearch() {
+  document.getElementById('form-search').value = '';
+  document.getElementById('form-search-clear').style.display = 'none';
+  renderFormList(allForms);
+}
+
+async function selectForm(uid, name) {
+  document.querySelectorAll('.form-list-item').forEach(el =>
+    el.classList.toggle('selected', el.dataset.uid === uid)
+  );
+  document.getElementById('form-uid').value = uid;
+  // Fetch form details (fields, version, meta)
+  await testConnection();
+}
+
 // ── Setup guide helpers ───────────────────────────────────────
 function switchTab(id, btn) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
@@ -532,12 +637,14 @@ function getKoboServer() {
 
 function resetConnStatus() {
   connVerified = false; canSubmit = false; koboFields = []; koboNoteFields = []; koboIdString = ''; koboVersion = ''; koboEnketoUrl = ''; koboFormUuid = '';
+  allForms = [];
+  document.getElementById('form-selector').style.display = 'none';
+  document.getElementById('form-uid').value = '';
   setConnUI('idle', 'Not connected yet');
   document.getElementById('conn-info-box').style.display = 'none';
   document.getElementById('form-meta').style.display = 'none';
   document.getElementById('badge-1').classList.remove('done');
   refreshSubmitBtn();
-  // Re-build mapping if excel already loaded, to drop kobo suggestions
   if (mainData.length && currentOp !== 'perms') buildMapping();
 }
 
@@ -551,14 +658,9 @@ function setConnUI(state, text, iconChar) {
 async function testConnection() {
   const token = document.getElementById('api-token').value.trim();
   const formUid = document.getElementById('form-uid').value.trim();
-  if (!token || !formUid) {
-    showInfoBox('error', 'Please fill in both API Token and Form UID before testing.');
-    return;
-  }
+  if (!token || !formUid) return; // called internally after selectForm — silent if no UID yet
   const server = getServerUrl();
-  const btn = document.getElementById('btn-connect');
-  btn.disabled = true;
-  setConnUI('loading', 'Connecting…');
+  setConnUI('loading', 'Loading form…');
   document.getElementById('conn-info-box').style.display = 'none';
   document.getElementById('form-meta').style.display = 'none';
 
@@ -574,28 +676,28 @@ async function testConnection() {
       showInfoBox('error', '&#10006; Authentication failed — the API token is invalid or has expired. Please check your token in KoboToolbox &rarr; Account Settings &rarr; Security.');
       connVerified = false; canSubmit = false;
       document.getElementById('badge-1').classList.remove('done');
-      btn.disabled = false; return;
+      return;
     }
     if (resp.status === 403) {
       setConnUI('error', 'Access denied');
       showInfoBox('error', '&#10006; Your token was accepted but does not have permission to access this form. Make sure the form is shared with your account or that you are the owner.');
       connVerified = false; canSubmit = false;
       document.getElementById('badge-1').classList.remove('done');
-      btn.disabled = false; return;
+      return;
     }
     if (resp.status === 404) {
       setConnUI('error', 'Form not found');
       showInfoBox('error', '&#10006; No form found with UID <strong>' + formUid + '</strong> on <em>' + server + '</em>. Double-check the Form UID and server selection.');
       connVerified = false; canSubmit = false;
       document.getElementById('badge-1').classList.remove('done');
-      btn.disabled = false; return;
+      return;
     }
     if (!resp.ok) {
       setConnUI('error', 'Server error (' + resp.status + ')');
       showInfoBox('error', '&#10006; Unexpected server response: ' + resp.status + ' ' + resp.statusText);
       connVerified = false; canSubmit = false;
       document.getElementById('badge-1').classList.remove('done');
-      btn.disabled = false; return;
+      return;
     }
 
     const asset = await resp.json();
@@ -657,7 +759,7 @@ async function testConnection() {
         'Submissions may fail until the form is deployed.');
       connVerified = true; canSubmit = true;
     } else {
-      setConnUI('success', 'Connected — ' + escHtml(formName));
+      setConnUI('success', '\u2713 ' + escHtml(formName));
       document.getElementById('conn-status').innerHTML =
         '<svg width="16" height="16" fill="none" stroke="#0F6E56" stroke-width="2.5" viewBox="0 0 24 24" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><polyline points="8 12 11 15 16 9"/></svg>' +
         '<span style="color:#0F6E56;font-weight:600">Connected</span>';
@@ -720,7 +822,6 @@ async function testConnection() {
     connVerified = false; canSubmit = false;
     document.getElementById('badge-1').classList.remove('done');
   }
-  btn.disabled = false;
 }
 
 function showInfoBox(type, html) {
@@ -1091,25 +1192,24 @@ async function exportZip() {
     rows = rows.slice(from, to);
   }
 
-  const idString  = koboIdString || document.getElementById('form-uid').value.trim();
-  const rootTag   = sanitizeTagName(idString);
-  const formUuid  = koboFormUuid || '';
+  const idString    = koboIdString || document.getElementById('form-uid').value.trim();
+  const rootTag     = sanitizeTagName(idString);
+  const formUuid    = koboFormUuid || '';
   const versionAttr = koboVersion ? ` version="${escXml(koboVersion)}"` : '';
-  const nowISO = new Date().toISOString().replace('Z', '+00:00');
+  const nowISO      = new Date().toISOString().replace('Z', '+00:00');
+  const ZIP_CHUNK   = 200; // max submissions per ZIP — keeps server processing safe
 
-  // System fields managed by the tool — strip from payload to avoid duplication
   const systemFields = ['start','end','username','__version__','_version_',
     'meta/rootUuid','meta/instanceID','formhub/uuid','_id','_uuid',
     '_submission_time','_validation_status','_notes','_status',
     '_submitted_by','_tags','_index'];
 
-  // Build one XML instance per row
+  // Build all XML instances first
   const xmlInstances = rows.map((row, i) => {
     const payload = buildPayload(row);
     systemFields.forEach(k => delete payload[k]);
     const instanceUUID = generateUUID();
-    const rootUUID     = generateUUID(); // meta/rootUuid — needed for Enketo edit
-
+    const rootUUID     = generateUUID();
     const xml =
       `<?xml version="1.0" ?>` +
       `<${rootTag} xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="${escXml(idString)}"${versionAttr}>` +
@@ -1119,57 +1219,70 @@ async function exportZip() {
       `<username/>` +
       payloadToXml(payload) +
       (koboVersion ? `<__version__>${escXml(koboVersion)}</__version__>` : '') +
-      `<meta>` +
-        `<instanceID>${instanceUUID}</instanceID>` +
-        `<rootUuid>${rootUUID}</rootUuid>` +
-      `</meta>` +
+      `<meta><instanceID>${instanceUUID}</instanceID><rootUuid>${rootUUID}</rootUuid></meta>` +
       `</${rootTag}>`;
     return { name: `submission_${String(i+1).padStart(4,'0')}_${instanceUUID}.xml`, xml };
   });
 
-  // Build ZIP using JSZip
-  const zip = new JSZip();
-  const instancesFolder = zip.folder('instances');
-  xmlInstances.forEach(({ name, xml }) => {
-    const folder = instancesFolder.folder(name.replace('.xml',''));
-    folder.file(name, xml);
-  });
-
-  const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `kobo_bulk_${idString}_${rows.length}rows.zip`;
-  a.click();
-
-  // Derive the KC (KoboCat) subdomain from the selected KF server.
-  // eu.kobotoolbox.org      -> kc-eu.kobotoolbox.org
-  // kf.kobotoolbox.org      -> kc.kobotoolbox.org
-  // kobo.humanitarianresponse.info -> kc.humanitarianresponse.info
-  // custom/Worker URLs      -> fall back to eu (most common) with a note
-  const koboServer = getKoboServer();
-  let kcHost;
-  if (koboServer.includes('eu.kobotoolbox.org')) {
-    kcHost = 'kc-eu.kobotoolbox.org';
-  } else if (koboServer.includes('kf.kobotoolbox.org')) {
-    kcHost = 'kc.kobotoolbox.org';
-  } else { // kobo.humanitarianresponse.info
-    kcHost = 'kc.humanitarianresponse.info';
+  // Split into chunks
+  const chunks = [];
+  for (let i = 0; i < xmlInstances.length; i += ZIP_CHUNK) {
+    chunks.push(xmlInstances.slice(i, i + ZIP_CHUNK));
   }
-  const uploadUrl = `https://${kcHost}/${username}/bulk-submission-form`;
-  document.getElementById('csv-export-done').style.display = 'block';
-  document.getElementById('zip-done-msg').innerHTML =
-    `&#10003; <strong>ZIP exported (${rows.length} submissions).</strong><br><br>` +
-    `Now upload it at:<br>` +
-    `<a href="${uploadUrl}" target="_blank" rel="noopener" style="color:#0F6E56;font-weight:600;word-break:break-all">${uploadUrl}</a><br><br>` +
-    `<span style="font-size:12px">Log in to KoboToolbox first, then open that link and upload the ZIP file.</span>`;
+  const totalChunks = chunks.length;
 
-  // Show Results section with export summary
+  // Derive KC host
+  const koboServer = getKoboServer();
+  const kcHost = koboServer.includes('kf.kobotoolbox.org') ? 'kc.kobotoolbox.org'
+    : koboServer.includes('humanitarianresponse.info') ? 'kc.humanitarianresponse.info'
+    : 'kc-eu.kobotoolbox.org';
+  const uploadUrl = `https://${kcHost}/${username}/bulk-submission-form`;
+
+  // Generate and download each chunk ZIP (small delay between to avoid browser blocking)
+  for (let ci = 0; ci < totalChunks; ci++) {
+    const chunk = chunks[ci];
+    const zip = new JSZip();
+    const instancesFolder = zip.folder('instances');
+    chunk.forEach(({ name, xml }) => {
+      instancesFolder.folder(name.replace('.xml','')).file(name, xml);
+    });
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = totalChunks > 1
+      ? `kobo_bulk_${idString}_part${ci+1}of${totalChunks}_${chunk.length}rows.zip`
+      : `kobo_bulk_${idString}_${rows.length}rows.zip`;
+    a.click();
+    if (ci < totalChunks - 1) await sleep(800); // brief pause between downloads
+  }
+
+  // Done message
+  document.getElementById('csv-export-done').style.display = 'block';
+  const chunkNote = totalChunks > 1
+    ? `<br><br><div class="info-box warning" style="margin-top:.5rem">&#9888; <strong>${rows.length} submissions split into ${totalChunks} ZIP files</strong> of ~${ZIP_CHUNK} each to avoid server timeout. Upload them one at a time — wait for each upload to complete before starting the next.</div>`
+    : '';
+  document.getElementById('zip-done-msg').innerHTML =
+    `&#10003; <strong>${totalChunks > 1 ? totalChunks + ' ZIPs' : 'ZIP'} exported (${rows.length} submissions total).</strong><br><br>` +
+    `Upload at:<br>` +
+    `<a href="${uploadUrl}" target="_blank" rel="noopener" style="color:#0F6E56;font-weight:600;word-break:break-all">${uploadUrl}</a>` +
+    chunkNote +
+    `<br><br><span style="font-size:12px">Log in to KoboToolbox first, then open that link and upload the ZIP file(s).</span>`;
+
+  // Results section
   const resultsEl = document.getElementById('sec-results');
   resultsEl.style.display = 'block';
   document.getElementById('log-wrap').innerHTML = '';
   updateStats(rows.length, rows.length, 0, rows.length);
   document.getElementById('prog-bar').style.width = '100%';
-  rows.forEach((_, i) => addLog(i + 1, 'ok', 'Included in ZIP export'));
+  if (totalChunks > 1) {
+    for (let ci = 0; ci < totalChunks; ci++) {
+      const start = ci * ZIP_CHUNK + 1;
+      const end   = Math.min((ci + 1) * ZIP_CHUNK, rows.length);
+      addLog(ci + 1, 'ok', `Part ${ci+1}/${totalChunks} — rows ${start}–${end} (${end-start+1} submissions)`);
+    }
+  } else {
+    rows.forEach((_, i) => addLog(i + 1, 'ok', 'Included in ZIP export'));
+  }
   resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -1551,17 +1664,17 @@ async function startEdits() {
   document.getElementById('ctrl-row-edit').style.display = 'flex';
 
   const url = `${serverUrl}/api/v2/assets/${formUid}/data/bulk/`;
+  const CHUNK_SIZE = 200; // max IDs per PATCH request — keeps server response times safe
   let ok = 0, err = 0;
 
-  // One PATCH per field — each updates all submission IDs at once
+  // One PATCH per field — chunked to avoid server timeouts on large datasets
   for (let fi = 0; fi < mappedFields.length; fi++) {
     if (editCancelled) break;
     while (editPaused && !editCancelled) await sleep(200);
     if (editCancelled) break;
 
     const { col, field } = mappedFields[fi];
-    // Collect submission IDs and their new values grouped by value
-    // (bulk endpoint accepts one value per call — group rows by same value)
+    // Group rows by value — each unique value needs its own PATCH payload
     const valueGroups = {};
     rows.forEach(row => {
       const id  = row[idCol];
@@ -1571,9 +1684,26 @@ async function startEdits() {
       valueGroups[val].push(Number(id));
     });
 
-    let fieldOk = true;
+    // Split each value group into chunks of CHUNK_SIZE
+    const chunks = []; // [{val, ids}]
     for (const [val, ids] of Object.entries(valueGroups)) {
+      for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+        chunks.push({ val, ids: ids.slice(i, i + CHUNK_SIZE) });
+      }
+    }
+    const totalChunks = chunks.length;
+
+    let fieldOk = true;
+    let silentFail = false;
+    let validatedField = false;
+
+    for (let ci = 0; ci < totalChunks; ci++) {
       if (editCancelled) break;
+      while (editPaused && !editCancelled) await sleep(200);
+      if (editCancelled) break;
+
+      const { val, ids } = chunks[ci];
+      const chunkLabel = totalChunks > 1 ? ` (chunk ${ci+1}/${totalChunks})` : '';
       try {
         const resp = await fetch(url, {
           method: 'PATCH',
@@ -1584,9 +1714,34 @@ async function startEdits() {
           const j = await resp.json().catch(() => ({}));
           throw new Error(j.detail || resp.status+' '+resp.statusText);
         }
-      } catch(e) { fieldOk = false; err++; addLog(fi+1,'err',`${field}: ${e.message}`); logEntries.push({row:fi+1,status:'error',message:`${field}: ${e.message}`}); break; }
+        // Validate field name exists in response (only needed once per field)
+        if (!validatedField) {
+          const j = await resp.json().catch(() => null);
+          if (j && j.results && Array.isArray(j.results) && j.results.length > 0) {
+            if (!(field in j.results[0])) {
+              silentFail = true; fieldOk = false; err++;
+              addLog(fi+1, 'err', `${field}: field not found in form — check name or group prefix`);
+              logEntries.push({row:fi+1, status:'error', message:`${field}: field not found in response`});
+              break;
+            }
+          }
+          validatedField = true;
+        }
+        if (totalChunks > 1) addLog(fi+1, 'ok', `${field}${chunkLabel} — ${ids.length} rows`);
+      } catch(e) {
+        fieldOk = false; err++;
+        addLog(fi+1, 'err', `${field}${chunkLabel}: ${e.message}`);
+        logEntries.push({row:fi+1, status:'error', message:`${field}${chunkLabel}: ${e.message}`});
+        break;
+      }
+      if (ci < totalChunks - 1 && !editCancelled) await sleep(delay);
     }
-    if (fieldOk) { ok++; addLog(fi+1,'ok',`${field} — ${rows.length} row(s) updated`); logEntries.push({row:fi+1,status:'ok',message:`${field} updated`}); }
+    if (fieldOk) {
+      ok++;
+      const chunkInfo = totalChunks > 1 ? ` (${totalChunks} chunks)` : '';
+      addLog(fi+1, 'ok', `${field} — ${rows.length} row(s) updated${chunkInfo}`);
+      logEntries.push({row:fi+1, status:'ok', message:`${field} updated (${rows.length} rows)`});
+    }
     updateStats(fi+1, ok, err, mappedFields.length);
     if (fi < mappedFields.length-1 && !editCancelled) await sleep(delay);
   }
