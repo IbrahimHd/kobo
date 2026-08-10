@@ -632,11 +632,13 @@ async function connectAndLoadForms() {
     if (!allForms.length) throw new Error('No forms found for this token');
 
     setConnUI('success', `Connected — ${allForms.length} form${allForms.length !== 1 ? 's' : ''} found`);
-    if (currentOp !== 'perms') {
+    if (currentOp === 'perms') {
+      connVerified = true; // for perms, connection itself is sufficient — no form selection needed
+      populatePermsFormList();
+      refreshSubmitBtn();
+    } else {
       document.getElementById('form-selector').style.display = 'block';
       renderFormList(allForms);
-    } else {
-      populatePermsFormList();
     }
 
   } catch(e) {
