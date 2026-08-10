@@ -2158,21 +2158,32 @@ async function startPermissions() {
             body: JSON.stringify({ user: userUrl, permission: permUrl })
           });
         } else {
-          // Revoke: first find the assignment URL, then DELETE it
+          // Revoke: fetch assignments list through proxy, then DELETE each match through proxy
           const listResp = await fetch(`${listUrl}?format=json`, {
             headers: { 'Authorization': 'Token '+token, 'Accept': 'application/json' }
           });
           if (!listResp.ok) throw new Error(`Failed to fetch assignments: ${listResp.status}`);
           const listData = await listResp.json();
           const assignments = listData.results || listData || [];
-          // Find assignments matching this user and (if not revoking all) this permission
+
+          // Match by username — assignment.user is a full URL like https://eu.../api/v2/users/username/
           const matches = assignments.filter(a =>
-            a.user && a.user.includes(`/users/${username}/`)
+            a.user && a.user.replace(/\/$/, '').split('/').pop() === username
           );
           if (!matches.length) throw new Error(`No permission found for "${username}" on this form`);
-          // DELETE each matching assignment
+
+          // DELETE each match — route through proxy by replacing the server origin with proxyUrl
+          const proxyUrl = getServerUrl();
           for (const assignment of matches) {
-            const delResp = await fetch(assignment.url, {
+            // Extract just the /api/... path from the assignment URL and route through proxy
+            let delUrl;
+            try {
+              const parsed = new URL(assignment.url);
+              delUrl = proxyUrl + parsed.pathname;
+            } catch(e) {
+              delUrl = assignment.url; // fallback
+            }
+            const delResp = await fetch(delUrl, {
               method: 'DELETE',
               headers: { 'Authorization': 'Token '+token }
             });
@@ -2207,9 +2218,9 @@ async function startPermissions() {
   permsRunning = false;
   document.getElementById('ctrl-row-perms').style.display = 'none';
   document.getElementById('perms-btn').disabled = false;
-  document.getElementById('perms-btn').innerHTML = permsCancelled
-    ? '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg> Assign permissions'
-    : '&#10003; Done — click to re-apply';
+  // Re-apply correct label based on current toggle state
+  setPermAction(isRevoke ? 'revoke' : 'add');
+  if (!permsCancelled) document.getElementById('perms-btn').innerHTML = '&#10003; Done — click to re-apply';
   document.getElementById('sec-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 </script>
