@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>KoboToolbox Management Tool</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23185FA5'/><ellipse cx='16' cy='10' rx='8' ry='3.5' fill='none' stroke='%23fff' stroke-width='2'/><path d='M8 10v5c0 1.93 3.58 3.5 8 3.5s8-1.57 8-3.5v-5' fill='none' stroke='%23fff' stroke-width='2'/><path d='M8 15v5c0 1.93 3.58 3.5 8 3.5s8-1.57 8-3.5v-5' fill='none' stroke='%23fff' stroke-width='2'/></svg>" />
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f3; color: #1a1a1a; min-height: 100vh; padding: 2rem 15%; }
@@ -37,7 +38,7 @@
   .toggle-btn:hover { border-color: #378ADD; color: #185FA5; }
   .toggle-btn.active { border-color: #378ADD; background: #EBF4FC; color: #185FA5; font-weight: 600; }
   /* Operation selector — larger cards */
-  .op-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 0; }
+  .op-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 0; }
   .op-card { border: 2px solid #e4e2dc; border-radius: 12px; padding: 1.25rem; cursor: pointer; transition: all .2s; background: #fafaf8; text-align: center; }
   .op-card:hover { border-color: #378ADD; background: #EBF4FC; }
   .op-card.active { border-color: #185FA5; background: #EBF4FC; }
@@ -121,7 +122,16 @@
   .perms-form-item .pf-name { font-weight: 600; color: #1a1a1a; flex:1; }
   .perms-form-item .pf-uid { font-size: 10px; color: #bbb; font-family: monospace; }
   .perms-form-empty { padding: .75rem; text-align: center; font-size: 12px; color: #aaa; }
-  /* Radio toggle */
+  /* Check User Access */
+  .access-table { width:100%; border-collapse:collapse; font-size:12px; margin-top:.75rem; }
+  .access-table th { background:#f5f4f0; padding:7px 10px; text-align:left; font-weight:600; color:#555; border-bottom:2px solid #e4e2dc; white-space:nowrap; }
+  .access-table td { padding:7px 10px; border-bottom:1px solid #f0ede6; vertical-align:top; }
+  .access-table tr:last-child td { border-bottom:none; }
+  .access-table tr:hover td { background:#fafaf8; }
+  .access-table .form-cell { font-weight:600; color:#1a1a1a; max-width:220px; }
+  .access-table .perm-pill { display:inline-block; font-size:10px; font-weight:600; padding:2px 7px; border-radius:12px; margin:1px 2px; background:#f0eafa; color:#6B4EAD; border:1px solid #d4c4f0; }
+  .access-table .no-access { color:#bbb; font-style:italic; font-size:11px; }
+  .access-table .user-col { background:#faf8ff; font-weight:700; color:#6B4EAD; font-size:12px; border-right:2px solid #e4e2dc; white-space:nowrap; }
   .radio-toggle { display: flex; gap: 12px; margin-bottom: .75rem; }
   .radio-toggle label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #555; cursor: pointer; }
   .radio-toggle input[type=radio] { accent-color: #6B4EAD; width:14px; height:14px; }
@@ -200,6 +210,11 @@
         <svg width="28" height="28" fill="none" stroke="#6B4EAD" stroke-width="1.8" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
         <div class="op-title">Manage Permissions</div>
         <div class="op-desc">Bulk-assign access permissions to a list of usernames via API</div>
+      </div>
+      <div class="op-card" id="op-check" onclick="setOperation('check')">
+        <svg width="28" height="28" fill="none" stroke="#0F7E6B" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><path d="M11 8v6"/><path d="M8 11h6"/></svg>
+        <div class="op-title">Check User Access</div>
+        <div class="op-desc">Look up which forms a user can access and what permission level they have</div>
       </div>
     </div>
   </div>
@@ -331,6 +346,22 @@
       </div>
       <div id="perms-form-list" style="border:1px solid #e4e2dc;border-radius:8px;max-height:220px;overflow-y:auto;margin-bottom:.4rem"></div>
       <p id="perms-form-count" style="font-size:11px;color:#6B4EAD"></p>
+    </div>
+
+    <!-- Step 4: Check User Access input (check operation only) -->
+    <div class="card" id="sec-check-input" style="display:none">
+      <div class="card-title"><span class="step-badge">4</span> Usernames to check</div>
+      <p style="font-size:12px;color:#888;margin-bottom:.75rem">Enter one or more KoboToolbox usernames. The tool will scan all your accessible forms and report their permission levels.</p>
+      <textarea id="check-usernames" rows="3" placeholder="Enter usernames separated by spaces or new lines…"
+        style="width:100%;font-size:13px;padding:8px 10px;border:1px solid #ddd;border-radius:8px;background:#fafaf8;outline:none;resize:vertical;font-family:inherit;line-height:1.5"
+        oninput="updateCheckUsernameCount()"></textarea>
+      <p id="check-username-count" style="font-size:11px;color:#888;margin-top:3px"></p>
+      <div style="margin-top:.75rem;display:flex;align-items:center;gap:10px">
+        <label style="font-size:13px;color:#555;display:flex;align-items:center;gap:6px">
+          <input type="checkbox" id="check-only-shared" style="accent-color:#0F7E6B;width:14px;height:14px" checked>
+          Only show forms where user has access
+        </label>
+      </div>
     </div>
 
     <!-- Step 5: Upload Excel / KoboToolbox Usernames -->
@@ -553,6 +584,39 @@
           </button>
         </div>
       </div>
+
+      <!-- Check User Access action -->
+      <div id="action-check" style="display:none">
+        <div class="info-box info" style="margin-bottom:1rem">
+          &#9432; Scans all your accessible forms and checks each one's permission assignments for the specified username(s). Results appear in a table below.
+        </div>
+        <button class="btn-primary" id="check-btn" onclick="startCheckAccess()" disabled
+          style="background:#0F7E6B" onmouseover="this.style.background='#0a5c4e'" onmouseout="this.style.background='#0F7E6B'">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          Check access
+        </button>
+      </div>
+    </div>
+
+    <!-- Check User Access Results (separate card) -->
+    <div class="card" id="sec-check-results" style="display:none">
+      <div class="card-title" style="justify-content:space-between">
+        <span style="display:flex;align-items:center;gap:8px">
+          <svg width="14" height="14" fill="none" stroke="#0F7E6B" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          Access Report
+        </span>
+        <button class="btn-sec" onclick="exportCheckResults()" style="font-size:11px;padding:4px 10px">
+          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export CSV
+        </button>
+      </div>
+      <div id="check-status" style="font-size:12px;color:#888;margin-bottom:.5rem"></div>
+      <div style="overflow-x:auto">
+        <table class="access-table" id="check-results-table">
+          <thead id="check-results-head"></thead>
+          <tbody id="check-results-body"></tbody>
+        </table>
+      </div>
     </div>
 
     <!-- Results -->
@@ -587,6 +651,8 @@
 
 <footer style="text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:#bbb">
   Brought to you by <a href="mailto:hammadibrahim@hotmail.com" style="color:#888;font-weight:600;text-decoration:none;border-bottom:1px dotted #bbb">Ibrahim Hammad</a>
+  &nbsp;&nbsp;|&nbsp;&nbsp;
+  <span style="color:#ccc">v 20260810.01</span>
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -633,9 +699,13 @@ async function connectAndLoadForms() {
 
     setConnUI('success', `Connected — ${allForms.length} form${allForms.length !== 1 ? 's' : ''} found`);
     if (currentOp === 'perms') {
-      connVerified = true; // for perms, connection itself is sufficient — no form selection needed
+      connVerified = true;
       populatePermsFormList();
       refreshSubmitBtn();
+    } else if (currentOp === 'check') {
+      connVerified = true;
+      const checkBtn = document.getElementById('check-btn');
+      if (checkBtn) checkBtn.disabled = false;
     } else {
       document.getElementById('form-selector').style.display = 'block';
       renderFormList(allForms);
@@ -1628,27 +1698,28 @@ function setOperation(op) {
   document.getElementById('op-submit').classList.toggle('active', op === 'submit');
   document.getElementById('op-edit').classList.toggle('active', op === 'edit');
   document.getElementById('op-perms').classList.toggle('active', op === 'perms');
+  document.getElementById('op-check').classList.toggle('active', op === 'check');
   document.getElementById('badge-1').classList.add('done');
 
-  // Show/hide sections based on operation
+  // Show/hide sections
   document.getElementById('steps-container').style.display = 'block';
-  initDragDrop(); // safe to init now — container is visible
+  initDragDrop();
   document.getElementById('sec-survey-mode').style.display  = op === 'submit' ? 'block' : 'none';
   document.getElementById('sec-perms-forms').style.display  = op === 'perms'  ? 'block' : 'none';
-  document.getElementById('form-selector').style.display    = op === 'perms'  ? 'none'  : (connVerified ? 'block' : 'none');
+  document.getElementById('sec-check-input').style.display  = op === 'check'  ? 'block' : 'none';
+  document.getElementById('form-selector').style.display    = (op === 'perms' || op === 'check') ? 'none' : (connVerified ? 'block' : 'none');
   document.getElementById('action-submit').style.display    = op === 'submit' ? 'block' : 'none';
-  document.getElementById('action-edit').style.display     = op === 'edit'   ? 'block' : 'none';
-  document.getElementById('action-perms').style.display    = op === 'perms'  ? 'block' : 'none';
-  document.getElementById('edit-upload-hint').style.display= op === 'edit'   ? 'block' : 'none';
+  document.getElementById('action-edit').style.display      = op === 'edit'   ? 'block' : 'none';
+  document.getElementById('action-perms').style.display     = op === 'perms'  ? 'block' : 'none';
+  document.getElementById('action-check').style.display     = op === 'check'  ? 'block' : 'none';
+  document.getElementById('edit-upload-hint').style.display = op === 'edit'   ? 'block' : 'none';
   document.getElementById('perms-username-source-wrap').style.display = op === 'perms' ? 'block' : 'none';
 
-  // Column mapping section: full grid for submit/edit, hidden+replaced for perms
-  if (op === 'perms') {
-    document.getElementById('sec-map').style.display = 'none';
-  } else {
-    document.getElementById('sec-map').style.display = 'block';
-    if (mainData.length) buildMapping();
-  }
+  // Hide upload card entirely for check operation
+  const uploadCard = document.getElementById('badge-upload')?.closest('.card');
+  if (uploadCard) uploadCard.style.display = op === 'check' ? 'none' : 'block';
+  document.getElementById('sec-map').style.display = (op === 'perms' || op === 'check') ? 'none' : 'block';
+  document.getElementById('sec-check-results').style.display = 'none';
 
   // Step numbering
   if (op === 'submit') {
@@ -1659,39 +1730,44 @@ function setOperation(op) {
     document.getElementById('badge-upload').textContent = '4';
     document.getElementById('badge-map').textContent    = '5';
     document.getElementById('badge-action').textContent = '6';
-  } else { // perms: 3=conn, 4=forms, 5=usernames, 6=action
+  } else if (op === 'perms') {
     document.getElementById('badge-perms-forms').textContent = '4';
     document.getElementById('badge-upload').textContent      = '5';
     document.getElementById('badge-action').textContent      = '6';
+  } else { // check: 3=conn, 4=usernames, 5=action
+    document.getElementById('badge-action').textContent = '5';
   }
 
   // Upload card title
   document.getElementById('upload-card-title').textContent =
     op === 'perms' ? 'KoboToolbox Usernames' : 'Upload Excel file';
 
-  // Setup guide content
+  // Guide
   document.getElementById('guide-submit').style.display = op === 'submit' ? 'block' : 'none';
   document.getElementById('guide-edit').style.display   = op === 'edit'   ? 'block' : 'none';
-  document.getElementById('guide-perms').style.display  = op === 'perms'  ? 'block' : 'none';
-  document.getElementById('guide-title').textContent    =
+  document.getElementById('guide-perms').style.display  = (op === 'perms' || op === 'check') ? 'block' : 'none';
+  document.getElementById('guide-title').textContent =
     op === 'submit' ? 'Setup guide — Cloudflare Worker required for connection'
     : op === 'edit' ? 'Setup guide — Cloudflare Worker required for edit operations'
-    : 'Setup guide — Cloudflare Worker required for managing permissions';
+    : op === 'perms' ? 'Setup guide — Cloudflare Worker required for managing permissions'
+    : 'Setup guide — Cloudflare Worker required for checking access';
   document.getElementById('guide-intro').textContent =
     op === 'submit' ? 'KoboToolbox blocks direct browser requests for the connection test. A Cloudflare Worker proxy relays these requests — the ZIP export itself then runs entirely client-side.'
     : op === 'edit' ? 'Edit operations call the KoboToolbox API directly from your browser. A Cloudflare Worker proxy is required to relay these requests.'
-    : 'Assigning permissions calls the KoboToolbox API directly from your browser. A Cloudflare Worker proxy is required to relay these requests.';
+    : op === 'perms' ? 'Assigning permissions calls the KoboToolbox API directly from your browser. A Cloudflare Worker proxy is required to relay these requests.'
+    : 'Checking user access calls the KoboToolbox API for each form. A Cloudflare Worker proxy is required to relay these requests.';
 
-  // Action title
   document.getElementById('action-title').textContent =
-    op === 'submit' ? 'Export / Submit' : op === 'edit' ? 'Apply edits' : 'Assign permissions';
+    op === 'submit' ? 'Export / Submit'
+    : op === 'edit' ? 'Apply edits'
+    : op === 'perms' ? 'Assign permissions'
+    : 'Check access';
 
-  // Reset button states if file loaded
   refreshSubmitBtn();
   if (op === 'perms') { populateUsernameColumn(); populatePermsFormList(); }
-
-  // Scroll to guide
+  if (op === 'check' && connVerified) document.getElementById('check-btn').disabled = false;
   document.getElementById('steps-container').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
 }
 
 // ── Edit row range ────────────────────────────────────────────
@@ -1940,6 +2016,133 @@ async function startEdits() {
   document.getElementById('edit-btn').disabled = false;
   document.getElementById('edit-btn').innerHTML = '&#10003; Done — click to re-apply';
   document.getElementById('sec-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── Check User Access ─────────────────────────────────────────
+let checkResults = []; // [{formName, formUid, username, permissions:[]}]
+
+function updateCheckUsernameCount() {
+  const raw = document.getElementById('check-usernames').value;
+  const count = raw.trim().split(/[\s,]+/).filter(Boolean).length;
+  const el = document.getElementById('check-username-count');
+  if (el) el.textContent = count ? `${count} username${count !== 1 ? 's' : ''}` : '';
+}
+
+async function startCheckAccess() {
+  const token = document.getElementById('api-token').value.trim();
+  const serverUrl = getServerUrl();
+  if (!token) { alert('Please connect first.'); return; }
+  if (!allForms.length) { alert('No forms loaded. Please connect first.'); return; }
+
+  const raw = document.getElementById('check-usernames').value;
+  const usernames = [...new Set(raw.trim().split(/[\s,]+/).filter(Boolean))];
+  if (!usernames.length) { alert('Please enter at least one username.'); return; }
+
+  const onlyShared = document.getElementById('check-only-shared').checked;
+
+  const btn = document.getElementById('check-btn');
+  btn.disabled = true;
+  btn.innerHTML = '&#9654; Checking…';
+
+  const statusEl = document.getElementById('check-status');
+  document.getElementById('sec-check-results').style.display = 'block';
+  document.getElementById('check-results-body').innerHTML = '';
+  document.getElementById('check-results-head').innerHTML = '';
+  checkResults = [];
+
+  let done = 0;
+  statusEl.textContent = `Checking 0 / ${allForms.length} forms…`;
+
+  // For each form, fetch its permission assignments
+  const formData = []; // [{form, assignmentsByUser:{username:[permCodes]}}]
+
+  for (const form of allForms) {
+    const url = `${serverUrl}/api/v2/assets/${form.uid}/permission-assignments/`;
+    try {
+      const resp = await fetch(url, {
+        headers: { 'Authorization': 'Token '+token, 'Accept': 'application/json' }
+      });
+      if (!resp.ok) { done++; statusEl.textContent = `Checking ${done} / ${allForms.length} forms…`; continue; }
+      const data = await resp.json();
+      const assignments = data.results || data || [];
+
+      // Build username → [permCodes] map for this form
+      const byUser = {};
+      assignments.forEach(a => {
+        const u = a.user?.split('?')[0].replace(/\/$/, '').split('/').pop();
+        const p = a.permission?.split('?')[0].replace(/\/$/, '').split('/').pop();
+        if (u && p) { if (!byUser[u]) byUser[u] = []; byUser[u].push(p); }
+      });
+      formData.push({ form, byUser });
+    } catch(e) { /* skip inaccessible forms */ }
+
+    done++;
+    statusEl.textContent = `Checking ${done} / ${allForms.length} forms…`;
+  }
+
+  statusEl.textContent = `Done — ${allForms.length} forms checked.`;
+
+  // Build results matrix: rows=forms, columns=usernames
+  // Filter to only forms where at least one user has access (if onlyShared)
+  const rows = formData.filter(({ byUser }) =>
+    !onlyShared || usernames.some(u => byUser[u] && byUser[u].length > 0)
+  );
+
+  checkResults = rows.map(({ form, byUser }) => ({
+    formName: form.name,
+    formUid:  form.uid,
+    users: usernames.map(u => ({ username: u, permissions: byUser[u] || [] }))
+  }));
+
+  renderCheckResults(usernames, checkResults);
+
+  btn.disabled = false;
+  btn.innerHTML = '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg> Check access';
+}
+
+function renderCheckResults(usernames, rows) {
+  const head = document.getElementById('check-results-head');
+  const body = document.getElementById('check-results-body');
+
+  // Header row
+  head.innerHTML = '<tr>' +
+    '<th>Form</th>' +
+    usernames.map(u => `<th>${escHtml(u)}</th>`).join('') +
+    '</tr>';
+
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="${usernames.length + 1}" style="text-align:center;color:#aaa;padding:1.5rem">No access found for the specified username(s)</td></tr>`;
+    return;
+  }
+
+  body.innerHTML = rows.map(({ formName, users }) =>
+    '<tr>' +
+    `<td class="form-cell">${escHtml(formName)}</td>` +
+    users.map(({ permissions }) =>
+      permissions.length
+        ? `<td>${permissions.map(p => `<span class="perm-pill">${escHtml(p)}</span>`).join('')}</td>`
+        : `<td class="no-access">No access</td>`
+    ).join('') +
+    '</tr>'
+  ).join('');
+}
+
+function exportCheckResults() {
+  if (!checkResults.length) return;
+  const usernames = checkResults[0].users.map(u => u.username);
+  const headers = ['Form', ...usernames];
+  const esc = v => '"' + String(v).replace(/"/g, '""') + '"';
+  const lines = [
+    headers.map(esc).join(','),
+    ...checkResults.map(({ formName, users }) =>
+      [formName, ...users.map(u => u.permissions.join('; ') || '')].map(esc).join(',')
+    )
+  ];
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `kobo_access_report_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
 }
 
 // ── Button state refresh ──────────────────────────────────────
