@@ -321,9 +321,21 @@
       <div id="mode-desc-repeat" style="display:none;font-size:13px;color:#666">Submissions have repeat group sections (e.g. household members). Use a separate sheet per repeat group.</div>
     </div>
 
-    <!-- Step 5: Upload Excel -->
+    <!-- Step 4: Select Forms (Manage Permissions only) -->
+    <div class="card" id="sec-perms-forms" style="display:none">
+      <div class="card-title"><span class="step-badge" id="badge-perms-forms">4</span> Select forms</div>
+      <div style="display:flex;gap:8px;margin-bottom:.4rem">
+        <input type="text" id="perms-form-search" placeholder="Search forms…" oninput="filterPermsFormList()" style="flex:1;font-size:12px;height:30px;padding:0 8px;border:1px solid #ddd;border-radius:7px;background:#fafaf8;outline:none" />
+        <button class="btn-sec" style="flex:none;padding:4px 10px;font-size:12px" onclick="toggleAllPermsForms(true)">All</button>
+        <button class="btn-sec" style="flex:none;padding:4px 10px;font-size:12px" onclick="toggleAllPermsForms(false)">None</button>
+      </div>
+      <div id="perms-form-list" style="border:1px solid #e4e2dc;border-radius:8px;max-height:220px;overflow-y:auto;margin-bottom:.4rem"></div>
+      <p id="perms-form-count" style="font-size:11px;color:#6B4EAD"></p>
+    </div>
+
+    <!-- Step 5: Upload Excel / KoboToolbox Usernames -->
     <div class="card">
-      <div class="card-title"><span class="step-badge" id="badge-upload">5</span> Upload Excel file</div>
+      <div class="card-title"><span class="step-badge" id="badge-upload">5</span> <span id="upload-card-title">Upload Excel file</span></div>
       <div id="edit-upload-hint" style="display:none;margin-bottom:1rem" class="info-box info">
         &#9432; Your Excel file must include a <strong>_id</strong> column containing KoboToolbox submission IDs. Export your existing data from KoboToolbox first to obtain these IDs.
       </div>
@@ -475,20 +487,10 @@
       <!-- Permissions action -->
       <div id="action-perms" style="display:none">
         <div class="info-box info" style="margin-bottom:1rem">
-          &#9432; Uses <code style="font-size:11px;background:#e8f1fb;padding:1px 5px;border-radius:4px">POST /api/v2/assets/{uid}/permission-assignments/</code>. Permissions are assigned per form per username.
+          &#9432; Uses <code style="font-size:11px;background:#e8f1fb;padding:1px 5px;border-radius:4px">POST /api/v2/assets/{uid}/permission-assignments/</code>. Permissions are assigned per selected form per username.
         </div>
 
-        <!-- 1. Form selection -->
-        <p style="font-size:12px;font-weight:600;color:#555;margin-bottom:.4rem">Forms to assign permissions to:</p>
-        <div style="display:flex;gap:8px;margin-bottom:.4rem">
-          <input type="text" id="perms-form-search" placeholder="Search forms…" oninput="filterPermsFormList()" style="flex:1;font-size:12px;height:30px;padding:0 8px;border:1px solid #ddd;border-radius:7px;background:#fafaf8;outline:none" />
-          <button class="btn-sec" style="flex:none;padding:4px 10px;font-size:12px" onclick="toggleAllPermsForms(true)">All</button>
-          <button class="btn-sec" style="flex:none;padding:4px 10px;font-size:12px" onclick="toggleAllPermsForms(false)">None</button>
-        </div>
-        <div id="perms-form-list" style="border:1px solid #e4e2dc;border-radius:8px;max-height:180px;overflow-y:auto;margin-bottom:.4rem"></div>
-        <p id="perms-form-count" style="font-size:11px;color:#6B4EAD;margin-bottom:.85rem"></p>
-
-        <!-- 2. Username column (Excel mode) -->
+        <!-- Username column (Excel mode) -->
         <div id="username-source-excel">
           <div class="field-row">
             <label>Username column</label>
@@ -633,8 +635,9 @@ async function connectAndLoadForms() {
     if (currentOp !== 'perms') {
       document.getElementById('form-selector').style.display = 'block';
       renderFormList(allForms);
+    } else {
+      populatePermsFormList();
     }
-    if (currentOp === 'perms') populatePermsFormList();
 
   } catch(e) {
     setConnUI('error', e.message);
@@ -1628,9 +1631,10 @@ function setOperation(op) {
   // Show/hide sections based on operation
   document.getElementById('steps-container').style.display = 'block';
   initDragDrop(); // safe to init now — container is visible
-  document.getElementById('sec-survey-mode').style.display = op === 'submit' ? 'block' : 'none';
-  document.getElementById('form-selector').style.display   = op === 'perms'  ? 'none'  : (connVerified ? 'block' : 'none');
-  document.getElementById('action-submit').style.display   = op === 'submit' ? 'block' : 'none';
+  document.getElementById('sec-survey-mode').style.display  = op === 'submit' ? 'block' : 'none';
+  document.getElementById('sec-perms-forms').style.display  = op === 'perms'  ? 'block' : 'none';
+  document.getElementById('form-selector').style.display    = op === 'perms'  ? 'none'  : (connVerified ? 'block' : 'none');
+  document.getElementById('action-submit').style.display    = op === 'submit' ? 'block' : 'none';
   document.getElementById('action-edit').style.display     = op === 'edit'   ? 'block' : 'none';
   document.getElementById('action-perms').style.display    = op === 'perms'  ? 'block' : 'none';
   document.getElementById('edit-upload-hint').style.display= op === 'edit'   ? 'block' : 'none';
@@ -1644,10 +1648,7 @@ function setOperation(op) {
     if (mainData.length) buildMapping();
   }
 
-  // Step numbering — sections shift depending on operation:
-  //   submit: 1=op, 2=guide/conn(3), 4=survey, 5=upload, 6=map, 7=action
-  //   edit:   1=op, 3=conn, 4=upload, 5=map, 6=action
-  //   perms:  1=op, 3=conn, 4=upload, 5=action (mapping hidden)
+  // Step numbering
   if (op === 'submit') {
     document.getElementById('badge-upload').textContent = '5';
     document.getElementById('badge-map').textContent    = '6';
@@ -1656,10 +1657,15 @@ function setOperation(op) {
     document.getElementById('badge-upload').textContent = '4';
     document.getElementById('badge-map').textContent    = '5';
     document.getElementById('badge-action').textContent = '6';
-  } else { // perms
-    document.getElementById('badge-upload').textContent = '4';
-    document.getElementById('badge-action').textContent = '5';
+  } else { // perms: 3=conn, 4=forms, 5=usernames, 6=action
+    document.getElementById('badge-perms-forms').textContent = '4';
+    document.getElementById('badge-upload').textContent      = '5';
+    document.getElementById('badge-action').textContent      = '6';
   }
+
+  // Upload card title
+  document.getElementById('upload-card-title').textContent =
+    op === 'perms' ? 'KoboToolbox Usernames' : 'Upload Excel file';
 
   // Setup guide content
   document.getElementById('guide-submit').style.display = op === 'submit' ? 'block' : 'none';
@@ -1945,7 +1951,11 @@ function refreshSubmitBtn() {
   if (submitEl) submitEl.disabled = !(hasConn && hasData);
   if (exportEl) exportEl.disabled = !hasData;
   if (editEl)   editEl.disabled   = !(hasConn && hasData);
-  if (permsEl)  permsEl.disabled  = !(hasConn && hasData);
+  if (permsEl && !permsEl.innerHTML.includes('Assigning') && !permsEl.innerHTML.includes('Revoking')) {
+    const src = document.querySelector('input[name="username-source"]:checked');
+    const isManual = src && src.value === 'text';
+    permsEl.disabled = !hasConn || (!isManual && !hasData);
+  }
 }
 
 // ── Manage Permissions ─────────────────────────────────────────
@@ -2032,6 +2042,7 @@ function onUsernameSourceChange() {
   document.getElementById('upload-zone').style.display    = isText ? 'none' : 'block';
   document.getElementById('sheet-selector').style.display = isText ? 'none' : (mainData.length ? 'block' : 'none');
   document.getElementById('preview-wrap').style.display   = isText ? 'none' : (mainData.length ? 'block' : 'none');
+  refreshSubmitBtn();
 }
 
 function updatePermsTextCount() {
