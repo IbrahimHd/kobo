@@ -112,6 +112,19 @@
   .form-list-item .form-name { font-weight: 600; color: #1a1a1a; }
   .form-list-item .form-uid { font-size: 11px; color: #aaa; font-family: monospace; }
   .form-list-empty { padding: 1rem; text-align: center; font-size: 13px; color: #aaa; }
+  /* Permissions multi-form selector */
+  .perms-form-item { padding: 7px 10px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #f0ede6; display: flex; align-items: center; gap: 8px; transition: background .1s; }
+  .perms-form-item:last-child { border-bottom: none; }
+  .perms-form-item:hover { background: #f5f4f0; }
+  .perms-form-item.selected { background: #f0eafa; border-left: 3px solid #6B4EAD; }
+  .perms-form-item input[type=checkbox] { accent-color: #6B4EAD; width:14px; height:14px; flex-shrink:0; }
+  .perms-form-item .pf-name { font-weight: 600; color: #1a1a1a; flex:1; }
+  .perms-form-item .pf-uid { font-size: 10px; color: #bbb; font-family: monospace; }
+  .perms-form-empty { padding: .75rem; text-align: center; font-size: 12px; color: #aaa; }
+  /* Radio toggle */
+  .radio-toggle { display: flex; gap: 12px; margin-bottom: .75rem; }
+  .radio-toggle label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #555; cursor: pointer; }
+  .radio-toggle input[type=radio] { accent-color: #6B4EAD; width:14px; height:14px; }
   .form-meta span { color: #888; }
   optgroup { font-weight: 600; font-style: normal; color: #555; }
   .preview-table-wrap { overflow-x: auto; font-size: 11px; border: 1px solid #e4e2dc; border-radius: 8px; }
@@ -314,6 +327,24 @@
       <div id="edit-upload-hint" style="display:none;margin-bottom:1rem" class="info-box info">
         &#9432; Your Excel file must include a <strong>_id</strong> column containing KoboToolbox submission IDs. Export your existing data from KoboToolbox first to obtain these IDs.
       </div>
+
+      <!-- Username source — shown only for Manage Permissions -->
+      <div id="perms-username-source-wrap" style="display:none;margin-bottom:1rem">
+        <p style="font-size:12px;font-weight:600;color:#555;margin-bottom:.4rem">Usernames:</p>
+        <div class="radio-toggle">
+          <label><input type="radio" name="username-source" value="excel" checked onchange="onUsernameSourceChange()"> From Excel file</label>
+          <label><input type="radio" name="username-source" value="text" onchange="onUsernameSourceChange()"> Enter manually</label>
+        </div>
+        <div id="username-source-text" style="display:none;margin-top:.5rem">
+          <textarea id="usernames-text" rows="3" placeholder="Enter KoboToolbox usernames separated by spaces or new lines…"
+            style="width:100%;font-size:13px;padding:8px 10px;border:1px solid #ddd;border-radius:8px;background:#fafaf8;outline:none;resize:vertical;font-family:inherit;line-height:1.5"
+            oninput="updatePermsTextCount()"></textarea>
+          <p id="perms-text-count" style="font-size:11px;color:#888;margin-top:3px"></p>
+        </div>
+        <div id="username-source-excel-hint" style="font-size:12px;color:#888;margin-top:.35rem">
+          &#9432; Upload an Excel file below and select the column containing usernames.
+        </div>
+      </div>
       <div class="upload-zone" id="upload-zone" onclick="document.getElementById('hidden-file').click()">
         <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
         <p id="upload-label">Click or drag &amp; drop your .xlsx file here</p>
@@ -444,13 +475,49 @@
       <!-- Permissions action -->
       <div id="action-perms" style="display:none">
         <div class="info-box info" style="margin-bottom:1rem">
-          &#9432; Uses <code style="font-size:11px;background:#e8f1fb;padding:1px 5px;border-radius:4px">POST /api/v2/assets/{uid}/permission-assignments/</code> to grant access. One request is sent per username.
+          &#9432; Uses <code style="font-size:11px;background:#e8f1fb;padding:1px 5px;border-radius:4px">POST /api/v2/assets/{uid}/permission-assignments/</code>. Permissions are assigned per form per username.
         </div>
-        <div class="field-row">
-          <label>Username column</label>
-          <select id="username-col"></select>
+
+        <!-- 1. Form selection -->
+        <p style="font-size:12px;font-weight:600;color:#555;margin-bottom:.4rem">Forms to assign permissions to:</p>
+        <div style="display:flex;gap:8px;margin-bottom:.4rem">
+          <input type="text" id="perms-form-search" placeholder="Search forms…" oninput="filterPermsFormList()" style="flex:1;font-size:12px;height:30px;padding:0 8px;border:1px solid #ddd;border-radius:7px;background:#fafaf8;outline:none" />
+          <button class="btn-sec" style="flex:none;padding:4px 10px;font-size:12px" onclick="toggleAllPermsForms(true)">All</button>
+          <button class="btn-sec" style="flex:none;padding:4px 10px;font-size:12px" onclick="toggleAllPermsForms(false)">None</button>
         </div>
-        <div class="field-row">
+        <div id="perms-form-list" style="border:1px solid #e4e2dc;border-radius:8px;max-height:180px;overflow-y:auto;margin-bottom:.4rem"></div>
+        <p id="perms-form-count" style="font-size:11px;color:#6B4EAD;margin-bottom:.85rem"></p>
+
+        <!-- 2. Username column (Excel mode) -->
+        <div id="username-source-excel">
+          <div class="field-row">
+            <label>Username column</label>
+            <select id="username-col"></select>
+          </div>
+          <div class="field-row">
+            <label>Rows to process</label>
+            <select id="row-range-perms"><option value="all">All rows</option><option value="range">Custom range…</option></select>
+          </div>
+          <div id="range-inputs-perms" style="display:none;margin-bottom:8px">
+            <div class="field-row"><label>From row</label><input type="number" id="range-from-perms" value="1" min="1" style="width:80px;flex:none" /></div>
+            <div class="field-row"><label>To row</label><input type="number" id="range-to-perms" value="70" min="1" style="width:80px;flex:none" /></div>
+          </div>
+        </div>
+
+        <!-- 3. Permission action toggle -->
+        <div class="toggle-row" style="margin-bottom:.5rem;margin-top:.25rem">
+          <button class="toggle-btn active" id="btn-perm-add" onclick="setPermAction('add')">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>
+            Add / Change Permission
+          </button>
+          <button class="toggle-btn" id="btn-perm-revoke" onclick="setPermAction('revoke')">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="16" y1="11" x2="22" y2="11"/></svg>
+            Revoke Permission
+          </button>
+        </div>
+
+        <!-- 4. Permission level -->
+        <div class="field-row" id="permission-level-row">
           <label>Permission level</label>
           <select id="permission-level">
             <option value="view_asset">View form (view_asset)</option>
@@ -463,15 +530,8 @@
             <option value="manage_asset">Manage project — full access (manage_asset)</option>
           </select>
         </div>
-        <p class="hint" style="margin-bottom:.5rem">&#9432; "Manage project" grants all permissions automatically and implies the others.</p>
-        <div class="field-row">
-          <label>Rows to process</label>
-          <select id="row-range-perms"><option value="all">All rows</option><option value="range">Custom range…</option></select>
-        </div>
-        <div id="range-inputs-perms" style="display:none;margin-bottom:8px">
-          <div class="field-row"><label>From row</label><input type="number" id="range-from-perms" value="1" min="1" style="width:80px;flex:none" /></div>
-          <div class="field-row"><label>To row</label><input type="number" id="range-to-perms" value="70" min="1" style="width:80px;flex:none" /></div>
-        </div>
+        <p class="hint" id="perm-level-hint" style="margin-bottom:.75rem">&#9432; "Manage project" grants all permissions automatically and implies the others.</p>
+
         <div class="field-row">
           <label>Delay (ms)</label>
           <input type="range" min="0" max="2000" step="100" value="300" id="delay-slider-perms" oninput="document.getElementById('delay-val-perms').textContent=this.value+'ms'" style="flex:1" />
@@ -570,8 +630,11 @@ async function connectAndLoadForms() {
     if (!allForms.length) throw new Error('No forms found for this token');
 
     setConnUI('success', `Connected — ${allForms.length} form${allForms.length !== 1 ? 's' : ''} found`);
-    document.getElementById('form-selector').style.display = 'block';
-    renderFormList(allForms);
+    if (currentOp !== 'perms') {
+      document.getElementById('form-selector').style.display = 'block';
+      renderFormList(allForms);
+    }
+    if (currentOp === 'perms') populatePermsFormList();
 
   } catch(e) {
     setConnUI('error', e.message);
@@ -1566,10 +1629,12 @@ function setOperation(op) {
   document.getElementById('steps-container').style.display = 'block';
   initDragDrop(); // safe to init now — container is visible
   document.getElementById('sec-survey-mode').style.display = op === 'submit' ? 'block' : 'none';
+  document.getElementById('form-selector').style.display   = op === 'perms'  ? 'none'  : (connVerified ? 'block' : 'none');
   document.getElementById('action-submit').style.display   = op === 'submit' ? 'block' : 'none';
   document.getElementById('action-edit').style.display     = op === 'edit'   ? 'block' : 'none';
   document.getElementById('action-perms').style.display    = op === 'perms'  ? 'block' : 'none';
   document.getElementById('edit-upload-hint').style.display= op === 'edit'   ? 'block' : 'none';
+  document.getElementById('perms-username-source-wrap').style.display = op === 'perms' ? 'block' : 'none';
 
   // Column mapping section: full grid for submit/edit, hidden+replaced for perms
   if (op === 'perms') {
@@ -1615,7 +1680,7 @@ function setOperation(op) {
 
   // Reset button states if file loaded
   refreshSubmitBtn();
-  if (op === 'perms') populateUsernameColumn();
+  if (op === 'perms') { populateUsernameColumn(); populatePermsFormList(); }
 
   // Scroll to guide
   document.getElementById('steps-container').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1884,6 +1949,98 @@ function refreshSubmitBtn() {
 }
 
 // ── Manage Permissions ─────────────────────────────────────────
+
+// Populate the multi-form checklist for permissions
+function populatePermsFormList() {
+  const list = document.getElementById('perms-form-list');
+  if (!list) return;
+  if (!allForms.length) {
+    list.innerHTML = '<div class="perms-form-empty">Connect first to load forms</div>';
+    return;
+  }
+  renderPermsFormList(allForms);
+  updatePermsFormCount();
+}
+
+function renderPermsFormList(forms) {
+  const list = document.getElementById('perms-form-list');
+  if (!forms.length) { list.innerHTML = '<div class="perms-form-empty">No forms match</div>'; return; }
+  list.innerHTML = forms.map(f => `
+    <div class="perms-form-item" onclick="togglePermsForm('${f.uid}',this)">
+      <input type="checkbox" id="pfm_${f.uid}" value="${f.uid}" onchange="updatePermsFormCount()" onclick="event.stopPropagation()">
+      <span class="pf-name">${escHtml(f.name)}</span>
+      <span class="pf-uid">${f.uid}</span>
+    </div>`).join('');
+}
+
+function togglePermsForm(uid, el) {
+  const cb = document.getElementById('pfm_' + uid);
+  if (cb) { cb.checked = !cb.checked; el.classList.toggle('selected', cb.checked); }
+  updatePermsFormCount();
+}
+
+function filterPermsFormList() {
+  const q = document.getElementById('perms-form-search').value.toLowerCase();
+  renderPermsFormList(allForms.filter(f =>
+    f.name.toLowerCase().includes(q) || f.uid.toLowerCase().includes(q)
+  ));
+  updatePermsFormCount();
+}
+
+function toggleAllPermsForms(checked) {
+  document.querySelectorAll('#perms-form-list input[type=checkbox]').forEach(cb => {
+    cb.checked = checked;
+    cb.closest('.perms-form-item').classList.toggle('selected', checked);
+  });
+  updatePermsFormCount();
+}
+
+function updatePermsFormCount() {
+  const count = document.querySelectorAll('#perms-form-list input[type=checkbox]:checked').length;
+  const el = document.getElementById('perms-form-count');
+  if (el) el.textContent = count ? `${count} form${count !== 1 ? 's' : ''} selected` : 'No forms selected';
+}
+
+function getSelectedPermsForms() {
+  return [...document.querySelectorAll('#perms-form-list input[type=checkbox]:checked')]
+    .map(cb => ({ uid: cb.value, name: allForms.find(f => f.uid === cb.value)?.name || cb.value }));
+}
+
+// ── Permission action toggle (Add/Change vs Revoke) ───────────
+function setPermAction(action) {
+  const isRevoke = action === 'revoke';
+  document.getElementById('btn-perm-add').classList.toggle('active', !isRevoke);
+  document.getElementById('btn-perm-revoke').classList.toggle('active', isRevoke);
+  document.getElementById('permission-level').disabled = isRevoke;
+  document.getElementById('permission-level-row').style.opacity = isRevoke ? '0.4' : '1';
+  document.getElementById('perm-level-hint').style.display = isRevoke ? 'none' : 'block';
+  // Update button label
+  const btn = document.getElementById('perms-btn');
+  if (btn) btn.innerHTML = isRevoke
+    ? '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="16" y1="11" x2="22" y2="11"/></svg> Revoke permissions'
+    : '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg> Assign permissions';
+}
+
+// Username source toggle
+function onUsernameSourceChange() {
+  const src = document.querySelector('input[name="username-source"]:checked').value;
+  const isText = src === 'text';
+  document.getElementById('username-source-text').style.display         = isText  ? 'block' : 'none';
+  document.getElementById('username-source-excel-hint').style.display   = isText  ? 'none'  : 'block';
+  document.getElementById('username-source-excel').style.display        = isText  ? 'none'  : 'block';
+  // Hide the drop zone and sheet selector when manual entry is selected
+  document.getElementById('upload-zone').style.display    = isText ? 'none' : 'block';
+  document.getElementById('sheet-selector').style.display = isText ? 'none' : (mainData.length ? 'block' : 'none');
+  document.getElementById('preview-wrap').style.display   = isText ? 'none' : (mainData.length ? 'block' : 'none');
+}
+
+function updatePermsTextCount() {
+  const raw = document.getElementById('usernames-text').value;
+  const count = raw.trim().split(/[\s,]+/).filter(Boolean).length;
+  const el = document.getElementById('perms-text-count');
+  if (el) el.textContent = count ? `${count} username${count !== 1 ? 's' : ''}` : '';
+}
+
 function populateUsernameColumn() {
   const sel = document.getElementById('username-col');
   if (!sel || !mainData.length) return;
@@ -1917,73 +2074,121 @@ function cancelPermissions() {
 }
 
 async function startPermissions() {
-  const token   = document.getElementById('api-token').value.trim();
-  const formUid = document.getElementById('form-uid').value.trim();
+  const token     = document.getElementById('api-token').value.trim();
   const serverUrl = getServerUrl();
-  if (!token || !formUid || !mainData.length) {
-    alert('Please complete connection test and upload a file first.'); return;
+  if (!token) { alert('Please complete connection first.'); return; }
+
+  // Get selected forms
+  const selectedForms = getSelectedPermsForms();
+  if (!selectedForms.length) { alert('Please select at least one form.'); return; }
+
+  // Get usernames from chosen source
+  const src = document.querySelector('input[name="username-source"]:checked').value;
+  let usernames = [];
+  if (src === 'excel') {
+    if (!mainData.length) { alert('Please upload an Excel file first.'); return; }
+    const usernameCol = document.getElementById('username-col').value;
+    let rows = mainData;
+    if (document.getElementById('row-range-perms').value === 'range') {
+      const from = Math.max(0, parseInt(document.getElementById('range-from-perms').value)-1)||0;
+      const to   = parseInt(document.getElementById('range-to-perms').value)||rows.length;
+      rows = rows.slice(from, to);
+    }
+    usernames = [...new Set(rows.map(r => String(r[usernameCol] ?? '').trim()).filter(Boolean))];
+  } else {
+    const raw = document.getElementById('usernames-text').value;
+    usernames = [...new Set(raw.trim().split(/[\s,]+/).filter(Boolean))];
   }
 
-  const usernameCol = document.getElementById('username-col').value;
-  const permCode     = document.getElementById('permission-level').value;
-  if (!usernameCol) { alert('Please select a username column.'); return; }
+  if (!usernames.length) { alert('No usernames found.'); return; }
 
-  let rows = mainData;
-  if (document.getElementById('row-range-perms').value === 'range') {
-    const from = Math.max(0, parseInt(document.getElementById('range-from-perms').value)-1)||0;
-    const to   = parseInt(document.getElementById('range-to-perms').value)||rows.length;
-    rows = rows.slice(from, to);
-  }
+  const permCode   = document.getElementById('permission-level').value;
+  const isRevoke   = document.getElementById('btn-perm-revoke').classList.contains('active');
+  const delay      = parseInt(document.getElementById('delay-slider-perms').value)||300;
+  const actionLabel = isRevoke ? 'Revoking…' : 'Assigning…';
 
-  const usernames = [...new Set(rows.map(r => String(r[usernameCol] ?? '').trim()).filter(Boolean))];
-  if (!usernames.length) { alert('No usernames found in the selected column.'); return; }
-
-  const delay = parseInt(document.getElementById('delay-slider-perms').value)||300;
+  // Total operations = forms × usernames
+  const totalOps = selectedForms.length * usernames.length;
   logEntries = []; failedRows = []; permsCancelled = false; permsPaused = false;
   permsRunning = true;
   document.getElementById('sec-results').style.display = 'block';
   document.getElementById('log-wrap').innerHTML = '';
   document.getElementById('retry-btn').style.display = 'none';
-  updateStats(0, 0, 0, usernames.length);
+  updateStats(0, 0, 0, totalOps);
   document.getElementById('perms-btn').disabled = true;
-  document.getElementById('perms-btn').innerHTML = '&#9654; Assigning…';
+  document.getElementById('perms-btn').innerHTML = `&#9654; ${actionLabel}`;
   document.getElementById('ctrl-row-perms').style.display = 'flex';
 
-  const url = `${serverUrl}/api/v2/assets/${formUid}/permission-assignments/`;
-  const permUrl = `${serverUrl}/api/v2/permissions/${permCode}/`;
-  let ok = 0, err = 0;
+  const koboServer = getKoboServer();
+  let opsDone = 0, ok = 0, err = 0;
 
-  for (let i = 0; i < usernames.length; i++) {
+  for (const form of selectedForms) {
     if (permsCancelled) break;
-    while (permsPaused && !permsCancelled) await sleep(200);
-    if (permsCancelled) break;
+    const listUrl  = `${serverUrl}/api/v2/assets/${form.uid}/permission-assignments/`;
+    const permUrl  = `${koboServer}/api/v2/permissions/${permCode}/`;
 
-    const username = usernames[i];
-    const userUrl = `${serverUrl}/api/v2/users/${encodeURIComponent(username)}/`;
-    try {
-      const resp = await fetch(url, {
-        method: 'POST',
-        headers: { 'Authorization': 'Token '+token, 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ user: userUrl, permission: permUrl })
-      });
-      if (!resp.ok) {
-        const j = await resp.json().catch(() => ({}));
-        let msg = j.detail || JSON.stringify(j);
-        if (resp.status === 404) msg = `User "${username}" not found on this server`;
-        if (resp.status === 400 && Array.isArray(j) && j[0]) msg = j[0].user ? j[0].user[0] : msg;
-        throw new Error(msg);
+    for (let i = 0; i < usernames.length; i++) {
+      if (permsCancelled) break;
+      while (permsPaused && !permsCancelled) await sleep(200);
+      if (permsCancelled) break;
+
+      const username = usernames[i];
+      const userUrl  = `${koboServer}/api/v2/users/${encodeURIComponent(username)}/`;
+      opsDone++;
+      try {
+        let resp;
+        if (!isRevoke) {
+          // Add/Change: POST to permission-assignments
+          resp = await fetch(listUrl, {
+            method: 'POST',
+            headers: { 'Authorization': 'Token '+token, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ user: userUrl, permission: permUrl })
+          });
+        } else {
+          // Revoke: first find the assignment URL, then DELETE it
+          const listResp = await fetch(`${listUrl}?format=json`, {
+            headers: { 'Authorization': 'Token '+token, 'Accept': 'application/json' }
+          });
+          if (!listResp.ok) throw new Error(`Failed to fetch assignments: ${listResp.status}`);
+          const listData = await listResp.json();
+          const assignments = listData.results || listData || [];
+          // Find assignments matching this user and (if not revoking all) this permission
+          const matches = assignments.filter(a =>
+            a.user && a.user.includes(`/users/${username}/`)
+          );
+          if (!matches.length) throw new Error(`No permission found for "${username}" on this form`);
+          // DELETE each matching assignment
+          for (const assignment of matches) {
+            const delResp = await fetch(assignment.url, {
+              method: 'DELETE',
+              headers: { 'Authorization': 'Token '+token }
+            });
+            if (!delResp.ok && delResp.status !== 204) {
+              throw new Error(`Delete failed: ${delResp.status}`);
+            }
+          }
+          resp = { ok: true };
+        }
+
+        if (!isRevoke && !resp.ok) {
+          const j = await resp.json().catch(() => ({}));
+          let msg = j.detail || JSON.stringify(j);
+          if (resp.status === 404) msg = `User "${username}" not found`;
+          if (resp.status === 400 && Array.isArray(j) && j[0]?.user) msg = j[0].user[0];
+          throw new Error(msg);
+        }
+        ok++;
+        const action = isRevoke ? 'revoked from' : `${permCode} →`;
+        addLog(opsDone, 'ok', `${username} — ${action} ${escHtml(form.name)}`);
+        logEntries.push({row:opsDone, status:'ok', message:`${username} → ${form.name}`});
+      } catch(e) {
+        err++;
+        addLog(opsDone, 'err', `${username} → ${escHtml(form.name)}: ${e.message}`);
+        logEntries.push({row:opsDone, status:'error', message:`${username} → ${form.name}: ${e.message}`});
       }
-      ok++;
-      addLog(i+1, 'ok', `${username} — ${permCode} granted`);
-      logEntries.push({row:i+1, status:'ok', message:`${username} — ${permCode} granted`});
-    } catch(e) {
-      err++;
-      addLog(i+1, 'err', `${username}: ${e.message}`);
-      logEntries.push({row:i+1, status:'error', message:`${username}: ${e.message}`});
-      failedRows.push(rows.find(r => String(r[usernameCol]).trim() === username) || { [usernameCol]: username });
+      updateStats(opsDone, ok, err, totalOps);
+      if (!permsCancelled && (i < usernames.length-1 || form !== selectedForms[selectedForms.length-1])) await sleep(delay);
     }
-    updateStats(i+1, ok, err, usernames.length);
-    if (i < usernames.length-1 && !permsCancelled) await sleep(delay);
   }
 
   permsRunning = false;
@@ -1992,7 +2197,6 @@ async function startPermissions() {
   document.getElementById('perms-btn').innerHTML = permsCancelled
     ? '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg> Assign permissions'
     : '&#10003; Done — click to re-apply';
-  if (failedRows.length > 0) document.getElementById('retry-btn').style.display = 'flex';
   document.getElementById('sec-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 </script>
