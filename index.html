@@ -2166,47 +2166,38 @@ async function startPermissions() {
           const listData = await listResp.json();
           const assignments = listData.results || listData || [];
 
-          // Match by username AND permission codename — avoid deleting implied permissions
-          const matches = assignments.filter(a => {
-            const assignedUser = a.user?.split('?')[0].replace(/\/$/, '').split('/').pop();
-            const assignedPerm = a.permission?.split('?')[0].replace(/\/$/, '').split('/').pop();
-            return assignedUser === username && assignedPerm === permCode;
-          });
+          // Match ALL permissions for this username — delete every assignment regardless of codename
+          const matches = assignments.filter(a =>
+            a.user?.split('?')[0].replace(/\/$/, '').split('/').pop() === username
+          );
           if (!matches.length) {
-            // Show all user's permissions for diagnosis
-            const userPerms = assignments
-              .filter(a => a.user?.split('?')[0].replace(/\/$/, '').split('/').pop() === username)
-              .map(a => a.permission?.split('?')[0].replace(/\/$/, '').split('/').pop())
-              .join(', ');
-            throw new Error(
-              userPerms
-                ? `Permission "${permCode}" not found for "${username}". Their permissions: ${userPerms}`
-                : `No permissions found for "${username}" on this form`
-            );
+            const allUsers = [...new Set(assignments
+              .map(a => a.user?.split('?')[0].replace(/\/$/, '').split('/').pop())
+              .filter(Boolean))].join(', ');
+            throw new Error(`"${username}" has no permissions on this form${allUsers ? ` (users found: ${allUsers})` : ''}`);
           }
 
-          // DELETE each match — route through proxy
+          // DELETE each assignment — skip 404s (implied permissions can't be deleted directly)
           const proxyUrl = getServerUrl().replace(/\/$/, '');
+          let deleted = 0;
           for (const assignment of matches) {
-            if (!assignment.url) throw new Error(`Assignment has no URL (id: ${assignment.id || '?'})`);
-            // assignment.url e.g. https://eu.kobotoolbox.org/api/v2/assets/{uid}/permission-assignments/{perm_uid}/
-            // Route through proxy: strip origin, keep /api/... path
+            if (!assignment.url) continue;
             let apiPath;
-            try {
-              apiPath = new URL(assignment.url).pathname; // e.g. /api/v2/assets/.../permission-assignments/pXXX/
-            } catch(e) {
-              throw new Error(`Invalid assignment URL: ${assignment.url}`);
-            }
+            try { apiPath = new URL(assignment.url).pathname; }
+            catch(e) { continue; }
             const delUrl = proxyUrl + apiPath;
             const delResp = await fetch(delUrl, {
               method: 'DELETE',
               headers: { 'Authorization': 'Token '+token, 'Accept': 'application/json' }
             });
-            if (!delResp.ok && delResp.status !== 204) {
+            if (delResp.ok || delResp.status === 204) { deleted++; }
+            else if (delResp.status === 404) { /* implied permission — skip */ }
+            else {
               const errText = await delResp.text().catch(() => '');
               throw new Error(`DELETE failed (${delResp.status}): ${errText.slice(0,150)}`);
             }
           }
+          if (deleted === 0) throw new Error(`No permissions could be removed for "${username}" — they may be implied-only`);
           resp = { ok: true };
         }
 
@@ -2218,7 +2209,7 @@ async function startPermissions() {
           throw new Error(msg);
         }
         ok++;
-        const action = isRevoke ? 'revoked from' : `${permCode} →`;
+        const action = isRevoke ? `all permissions revoked from` : `${permCode} →`;
         addLog(opsDone, 'ok', `${username} — ${action} ${escHtml(form.name)}`);
         logEntries.push({row:opsDone, status:'ok', message:`${username} → ${form.name}`});
       } catch(e) {
