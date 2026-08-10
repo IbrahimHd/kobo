@@ -612,7 +612,7 @@
         </table>
       </div>
       <div style="margin-top:.75rem">
-        <button class="btn-sec" onclick="exportCheckResults()" style="font-size:12px">
+        <button class="btn-sec" id="export-check-btn" onclick="exportCheckResults()" style="font-size:12px" disabled>
           <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export CSV
         </button>
@@ -2057,7 +2057,6 @@ async function startCheckAccess() {
   const formData = []; // [{form, assignmentsByUser:{username:[permCodes]}}]
 
   for (const form of allForms) {
-    const url = `${serverUrl}/api/v2/assets/${form.uid}/permission-assignments/`;
     try {
       // Fetch ALL pages of permission assignments
       let assignments = [];
@@ -2066,18 +2065,17 @@ async function startCheckAccess() {
         const resp = await fetch(nextUrl, {
           headers: { 'Authorization': 'Token '+token, 'Accept': 'application/json' }
         });
-        if (!resp.ok) break;
+        if (!resp.ok) { nextUrl = null; break; }
         const data = await resp.json();
         const page = data.results || (Array.isArray(data) ? data : []);
         assignments = assignments.concat(page);
-        // Follow next page if exists — route through proxy
         if (data.next) {
-          try { nextUrl = serverUrl + new URL(data.next).pathname + new URL(data.next).search; }
+          try { nextUrl = serverUrl.replace(/\/$/, '') + new URL(data.next).pathname + new URL(data.next).search; }
           catch(e) { nextUrl = null; }
         } else { nextUrl = null; }
       }
 
-      // Build username → [permCodes] map for this form
+      // Build username → [permCodes] map
       const byUser = {};
       assignments.forEach(a => {
         const u = a.user?.split('?')[0].replace(/\/$/, '').split('/').pop();
@@ -2085,7 +2083,10 @@ async function startCheckAccess() {
         if (u && p) { if (!byUser[u]) byUser[u] = []; byUser[u].push(p); }
       });
       formData.push({ form, byUser });
-    } catch(e) { /* skip inaccessible forms */ }
+    } catch(e) {
+      // Still push form with empty data so it appears in results
+      formData.push({ form, byUser: {} });
+    }
 
     done++;
     statusEl.textContent = `Checking ${done} / ${allForms.length} forms…`;
@@ -2106,6 +2107,8 @@ async function startCheckAccess() {
   }));
 
   renderCheckResults(usernames, checkResults);
+  const exportBtn = document.getElementById('export-check-btn');
+  if (exportBtn) exportBtn.disabled = checkResults.length === 0;
 
   btn.disabled = false;
   btn.innerHTML = '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg> Check access';
