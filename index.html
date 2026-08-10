@@ -101,6 +101,7 @@
   .info-box.info { background: #EBF4FC; color: #0C447C; border-color: #378ADD; }
   .btn-sec { flex: 1; padding: 9px; font-size: 13px; border-radius: 8px; border: 1px solid #ddd; background: #fafaf8; color: #555; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: background .15s; }
   .btn-sec:hover { background: #f0ede6; }
+  .btn-sec:disabled { opacity: 0.4; cursor: not-allowed; }
   .ctrl-row { display: flex; gap: 8px; margin-top: .75rem; }
   .btn-pause { flex: 1; padding: 10px; background: #FAEEDA; color: #854F0B; border: 1px solid #BA7517; border-radius: 9px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; transition: background .15s; }
   .btn-pause:hover { background: #f5ddb8; }
@@ -2056,11 +2057,11 @@ async function startCheckAccess() {
   // For each form, fetch its permission assignments
   const formData = []; // [{form, assignmentsByUser:{username:[permCodes]}}]
 
+  const proxyBase = serverUrl.replace(/\/$/, '');
   for (const form of allForms) {
     try {
-      // Fetch ALL pages of permission assignments
       let assignments = [];
-      let nextUrl = `${serverUrl}/api/v2/assets/${form.uid}/permission-assignments/`;
+      let nextUrl = `${proxyBase}/api/v2/assets/${form.uid}/permission-assignments/`;
       while (nextUrl) {
         const resp = await fetch(nextUrl, {
           headers: { 'Authorization': 'Token '+token, 'Accept': 'application/json' }
@@ -2070,12 +2071,11 @@ async function startCheckAccess() {
         const page = data.results || (Array.isArray(data) ? data : []);
         assignments = assignments.concat(page);
         if (data.next) {
-          try { nextUrl = serverUrl.replace(/\/$/, '') + new URL(data.next).pathname + new URL(data.next).search; }
+          try { nextUrl = proxyBase + new URL(data.next).pathname + new URL(data.next).search; }
           catch(e) { nextUrl = null; }
         } else { nextUrl = null; }
       }
 
-      // Build username → [permCodes] map
       const byUser = {};
       assignments.forEach(a => {
         const u = a.user?.split('?')[0].replace(/\/$/, '').split('/').pop();
@@ -2084,7 +2084,6 @@ async function startCheckAccess() {
       });
       formData.push({ form, byUser });
     } catch(e) {
-      // Still push form with empty data so it appears in results
       formData.push({ form, byUser: {} });
     }
 
@@ -2117,6 +2116,7 @@ async function startCheckAccess() {
 function renderCheckResults(usernames, rows) {
   const head = document.getElementById('check-results-head');
   const body = document.getElementById('check-results-body');
+  const exportBtn = document.getElementById('export-check-btn');
 
   // Header row
   head.innerHTML = '<tr>' +
@@ -2126,6 +2126,7 @@ function renderCheckResults(usernames, rows) {
 
   if (!rows.length) {
     body.innerHTML = `<tr><td colspan="${usernames.length + 1}" style="text-align:center;color:#aaa;padding:1.5rem">No access found for the specified username(s)</td></tr>`;
+    if (exportBtn) exportBtn.disabled = true;
     return;
   }
 
@@ -2139,6 +2140,8 @@ function renderCheckResults(usernames, rows) {
     ).join('') +
     '</tr>'
   ).join('');
+
+  if (exportBtn) exportBtn.disabled = false;
 }
 
 function exportCheckResults() {
