@@ -2162,7 +2162,7 @@ async function startPermissions() {
           const listResp = await fetch(`${listUrl}?format=json`, {
             headers: { 'Authorization': 'Token '+token, 'Accept': 'application/json' }
           });
-          if (!listResp.ok) throw new Error(`Failed to fetch assignments: ${listResp.status}`);
+          if (!listResp.ok) throw new Error(`Failed to fetch assignments (${listResp.status})`);
           const listData = await listResp.json();
           const assignments = listData.results || listData || [];
 
@@ -2170,25 +2170,29 @@ async function startPermissions() {
           const matches = assignments.filter(a =>
             a.user && a.user.replace(/\/$/, '').split('/').pop() === username
           );
-          if (!matches.length) throw new Error(`No permission found for "${username}" on this form`);
+          if (!matches.length) {
+            const found = assignments.map(a => a.user?.replace(/\/$/, '').split('/').pop()).join(', ');
+            throw new Error(`No permission found for "${username}" (users with permissions: ${found || 'none'})`);
+          }
 
-          // DELETE each match — route through proxy by replacing the server origin with proxyUrl
+          // DELETE each match — route through proxy by replacing server origin with proxyUrl
           const proxyUrl = getServerUrl();
           for (const assignment of matches) {
-            // Extract just the /api/... path from the assignment URL and route through proxy
+            if (!assignment.url) throw new Error(`Assignment has no URL (id: ${assignment.id || '?'})`);
             let delUrl;
             try {
               const parsed = new URL(assignment.url);
-              delUrl = proxyUrl + parsed.pathname;
+              delUrl = proxyUrl.replace(/\/$/, '') + parsed.pathname;
             } catch(e) {
-              delUrl = assignment.url; // fallback
+              throw new Error(`Invalid assignment URL: ${assignment.url}`);
             }
             const delResp = await fetch(delUrl, {
               method: 'DELETE',
-              headers: { 'Authorization': 'Token '+token }
+              headers: { 'Authorization': 'Token '+token, 'Accept': 'application/json' }
             });
             if (!delResp.ok && delResp.status !== 204) {
-              throw new Error(`Delete failed: ${delResp.status}`);
+              const errText = await delResp.text().catch(() => '');
+              throw new Error(`DELETE failed (${delResp.status}): ${errText.slice(0,100)}`);
             }
           }
           resp = { ok: true };
