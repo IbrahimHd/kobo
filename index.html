@@ -7,10 +7,11 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23185FA5'/><ellipse cx='16' cy='10' rx='8' ry='3.5' fill='none' stroke='%23fff' stroke-width='2'/><path d='M8 10v5c0 1.93 3.58 3.5 8 3.5s8-1.57 8-3.5v-5' fill='none' stroke='%23fff' stroke-width='2'/><path d='M8 15v5c0 1.93 3.58 3.5 8 3.5s8-1.57 8-3.5v-5' fill='none' stroke='%23fff' stroke-width='2'/></svg>" />
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f3; color: #1a1a1a; min-height: 100vh; padding: 2rem 15%; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f3; color: #1a1a1a; min-height: 100vh; padding: 2rem 10%; }
+  @media (max-width: 1200px) { body { padding: 2rem 12%; } }
   @media (max-width: 900px) { body { padding: 1.5rem 5%; } }
   @media (max-width: 600px) { body { padding: 1rem 3%; } }
-  .container { max-width: 780px; margin: 0 auto; width: 100%; }
+  .container { max-width: 960px; margin: 0 auto; width: 100%; }
   header { margin-bottom: 1.75rem; }
   header h1 { font-size: 22px; font-weight: 600; color: #0c1a2e; display: flex; align-items: center; gap: 10px; }
   header p { font-size: 13px; color: #666; margin-top: 4px; }
@@ -653,7 +654,7 @@
 <footer style="text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:#bbb">
   Brought to you by <a href="mailto:hammadibrahim@hotmail.com" style="color:#888;font-weight:600;text-decoration:none;border-bottom:1px dotted #bbb">Ibrahim Hammad</a>
   &nbsp;&nbsp;|&nbsp;&nbsp;
-  <span style="color:#ccc">v 20260810.03</span>
+  <span style="color:#ccc">v 20260821.01</span>
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -895,21 +896,24 @@ async function testConnection() {
     }
 
     const survey = (asset.content && asset.content.survey) ? asset.content.survey : [];
-    const groupStack = []; // tracks nested group names for fully-qualified field paths
+    const groupStack = [];
     survey.forEach(field => {
-      const name = field.name || field.$autoname;
       const type = String(field.type || '').trim().toLowerCase();
-      if (!name) return;
+      const name = field.name || field.$autoname;
 
-      // Maintain group context stack
+      // Process group boundaries BEFORE the name guard —
+      // end_group rows have no name but must still pop the stack
       if (type === 'begin_group' || type === 'begin_repeat') {
-        groupStack.push(name); return;
+        if (name) groupStack.push(name);
+        return;
       }
       if (type === 'end_group' || type === 'end_repeat') {
-        groupStack.pop(); return;
+        groupStack.pop();
+        return;
       }
 
-      // Build fully-qualified name: group/subgroup/field_name
+      if (!name) return;
+
       const qualifiedName = groupStack.length > 0
         ? groupStack.join('/') + '/' + name
         : name;
