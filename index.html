@@ -654,8 +654,28 @@
 <footer style="text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:#bbb">
   Brought to you by <a href="mailto:hammadibrahim@hotmail.com" style="color:#888;font-weight:600;text-decoration:none;border-bottom:1px dotted #bbb">Ibrahim Hammad</a>
   &nbsp;&nbsp;|&nbsp;&nbsp;
-  <span style="color:#ccc">v 20260821.02</span>
+  <span style="color:#ccc" id="app-version"></span>
 </footer>
+<script>
+(function() {
+  const d = new Date();
+  const date = d.getFullYear().toString() +
+    String(d.getMonth()+1).padStart(2,'0') +
+    String(d.getDate()).padStart(2,'0');
+  // Sequential build number stored in localStorage per date
+  const key = 'kobo_tool_build_' + date;
+  let build = parseInt(localStorage.getItem(key) || '0');
+  // Only increment on first load of a new date
+  const lastDate = localStorage.getItem('kobo_tool_last_date');
+  if (lastDate !== date) {
+    build = 1;
+    localStorage.setItem(key, build);
+    localStorage.setItem('kobo_tool_last_date', date);
+  }
+  const version = `v ${date}.${String(build).padStart(2,'0')}`;
+  document.getElementById('app-version').textContent = version;
+})();
+</script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -1866,10 +1886,13 @@ async function startEdits() {
       if (checkResp.ok) {
         const submission = await checkResp.json();
         const submissionKeys = Object.keys(submission);
+        console.log('[PreFlight] Submission keys:', submissionKeys);
+        console.log('[PreFlight] Mapped fields:', mappedFields.map(f => f.field));
 
         const invalidFields = mappedFields.filter(({ field }) =>
           !submissionKeys.includes(field)
         );
+        console.log('[PreFlight] Invalid fields:', invalidFields.map(f => f.field));
 
         if (invalidFields.length > 0) {
           document.getElementById('edit-btn').disabled = false;
@@ -1877,9 +1900,7 @@ async function startEdits() {
             '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Apply edits';
           const fieldList = invalidFields.map(f => `• ${f.field}`).join('\n');
           const proceed = confirm(
-            `⚠️ The following mapped field(s) were not found in this form:\n\n${fieldList}\n\n` +
-            `These fields will be silently ignored by KoboToolbox.\n\n` +
-            `Do you want to proceed anyway with the remaining valid fields?`
+            `⚠️ The following mapped field(s) were not found in this form:\n\n${fieldList}\n\nDo you want to proceed anyway?`
           );
           if (!proceed) return;
           mappedFields.splice(0, mappedFields.length,
@@ -1891,7 +1912,7 @@ async function startEdits() {
           }
         }
       }
-    } catch(e) { /* pre-flight failed — proceed and let per-row errors surface */ }
+    } catch(e) { console.log('[PreFlight] Error:', e.message); }
     document.getElementById('edit-btn').disabled = false;
   }
   // ── End pre-flight ────────────────────────────────────────────
