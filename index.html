@@ -675,7 +675,7 @@
 <footer style="text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:#bbb">
   Brought to you by <a href="mailto:hammadibrahim@hotmail.com" style="color:#888;font-weight:600;text-decoration:none;border-bottom:1px dotted #bbb">Ibrahim Hammad</a>
   &nbsp;&nbsp;|&nbsp;&nbsp;
-  <span style="color:#ccc">v 20260810.03</span>
+  <span style="color:#ccc">v 20260810.04</span>
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -1899,21 +1899,31 @@ async function startEdits() {
 
   const delay = parseInt(document.getElementById('delay-slider-edit').value)||200;
 
-  // ── Pre-flight: check for mapped columns where ALL rows are blank ──
-  // These exist in the Excel file but have no data — likely unintentional
-  const blankFields = mappedFields.filter(({ col }) =>
+  // ── Pre-flight: blank column handling ────────────────────────
+  // All-blank columns → silently removed (nothing to edit)
+  const allBlankFields = mappedFields.filter(({ col }) =>
     rows.every(row => row[col] === '' || row[col] === null || row[col] === undefined)
+  );
+  if (allBlankFields.length > 0) {
+    mappedFields.splice(0, mappedFields.length,
+      ...mappedFields.filter(f => !allBlankFields.find(b => b.col === f.col))
+    );
+  }
+
+  // Partially-blank columns (any blank cell) → notify user
+  const partialBlankFields = mappedFields.filter(({ col }) =>
+    rows.some(row => row[col] === '' || row[col] === null || row[col] === undefined)
   );
 
   let clearBlanksOnKobo = false;
 
-  if (blankFields.length > 0) {
-    const fieldList = blankFields.map(f => `<li>${escHtml(f.field)}</li>`).join('');
+  if (partialBlankFields.length > 0) {
+    const fieldList = partialBlankFields.map(f => `<li>${escHtml(f.field)}</li>`).join('');
 
     // Message 1: inform and ask to continue
     const proceed = await showModal({
-      title: '⚠️ Blank columns detected',
-      body: `The following columns exist in your Excel file but all their cells are blank:`
+      title: '⚠️ Some cells are blank',
+      body: `The following columns have one or more blank cells:`
         + `<ul>${fieldList}</ul>`
         + `<br>Do you want to continue with the edit operation?`,
       buttons: [
@@ -1929,34 +1939,29 @@ async function startEdits() {
       return;
     }
 
-    // Message 2: ask what to do with the blank columns
+    // Message 2: ask what to do with the blank cells
     clearBlanksOnKobo = await showModal({
-      title: 'What should happen to blank columns?',
-      body: `Choose how to handle the blank columns in KoboToolbox:`,
+      title: 'What should happen to blank cells?',
+      body: `Choose how to handle blank cells in the above columns:`,
       buttons: [
         { label: 'Skip them — keep existing Kobo values', style: 'secondary', value: false },
         { label: 'Clear them — set to blank on Kobo', style: 'danger', value: true }
       ]
     });
-
-    // If skipping, remove fully-blank fields from mappedFields
-    if (!clearBlanksOnKobo) {
-      mappedFields.splice(0, mappedFields.length,
-        ...mappedFields.filter(f => !blankFields.find(b => b.col === f.col))
-      );
-      if (!mappedFields.length) {
-        await showModal({
-          title: 'Nothing to edit',
-          body: 'No fields with data remain after removing blank columns. The operation has been cancelled.',
-          buttons: [{ label: 'OK', style: 'primary', value: true }]
-        });
-        document.getElementById('edit-btn').disabled = false;
-        document.getElementById('edit-btn').innerHTML =
-          '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Apply edits';
-        return;
-      }
-    }
   }
+
+  if (!mappedFields.length) {
+    await showModal({
+      title: 'Nothing to edit',
+      body: 'All mapped columns are blank. The operation has been cancelled.',
+      buttons: [{ label: 'OK', style: 'primary', value: true }]
+    });
+    document.getElementById('edit-btn').disabled = false;
+    document.getElementById('edit-btn').innerHTML =
+      '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Apply edits';
+    return;
+  }
+  // ── End pre-flight ────────────────────────────────────────────
   // ── End pre-flight ────────────────────────────────────────────
 
   logEntries = []; failedRows = []; editCancelled = false; editPaused = false;
