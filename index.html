@@ -654,7 +654,7 @@
 <footer style="text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:#bbb">
   Brought to you by <a href="mailto:hammadibrahim@hotmail.com" style="color:#888;font-weight:600;text-decoration:none;border-bottom:1px dotted #bbb">Ibrahim Hammad</a>
   &nbsp;&nbsp;|&nbsp;&nbsp;
-  <span style="color:#ccc">v 20260821.01</span>
+  <span style="color:#ccc">v 20260810.02</span>
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -1853,8 +1853,7 @@ async function startEdits() {
 
   const delay = parseInt(document.getElementById('delay-slider-edit').value)||200;
 
-  // ── Pre-flight: validate all mapped field names against a real submission ──
-  // Fetch one submission to get the actual field keys before touching any data.
+  // ── Pre-flight: validate mapped field names against a real submission ──
   const firstId = rows.find(r => r[idCol])?.[idCol];
   if (firstId) {
     document.getElementById('edit-btn').disabled = true;
@@ -1868,17 +1867,14 @@ async function startEdits() {
         const submission = await checkResp.json();
         const submissionKeys = Object.keys(submission);
 
-        const invalidFields = mappedFields.filter(({ field }) => {
-          const leafName = field.includes('/') ? field.split('/').pop() : field;
-          return !(field in submission) &&
-                 !submissionKeys.some(k => k === field || k.endsWith('/' + leafName));
-        });
+        const invalidFields = mappedFields.filter(({ field }) =>
+          !submissionKeys.includes(field)
+        );
 
         if (invalidFields.length > 0) {
           document.getElementById('edit-btn').disabled = false;
           document.getElementById('edit-btn').innerHTML =
             '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Apply edits';
-
           const fieldList = invalidFields.map(f => `• ${f.field}`).join('\n');
           const proceed = confirm(
             `⚠️ The following mapped field(s) were not found in this form:\n\n${fieldList}\n\n` +
@@ -1886,8 +1882,6 @@ async function startEdits() {
             `Do you want to proceed anyway with the remaining valid fields?`
           );
           if (!proceed) return;
-
-          // Remove invalid fields from mappedFields before proceeding
           mappedFields.splice(0, mappedFields.length,
             ...mappedFields.filter(f => !invalidFields.includes(f))
           );
@@ -1897,7 +1891,7 @@ async function startEdits() {
           }
         }
       }
-    } catch(e) { /* pre-flight failed — proceed anyway and let per-field errors surface */ }
+    } catch(e) { /* pre-flight failed — proceed and let per-row errors surface */ }
     document.getElementById('edit-btn').disabled = false;
   }
   // ── End pre-flight ────────────────────────────────────────────
