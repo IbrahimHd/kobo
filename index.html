@@ -39,7 +39,7 @@
   .toggle-btn:hover { border-color: #378ADD; color: #185FA5; }
   .toggle-btn.active { border-color: #378ADD; background: #EBF4FC; color: #185FA5; font-weight: 600; }
   /* Operation selector — larger cards */
-  .op-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 0; }
+  .op-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 0; }
   .op-card { border: 2px solid #e4e2dc; border-radius: 12px; padding: 1.25rem; cursor: pointer; transition: all .2s; background: #fafaf8; text-align: center; }
   .op-card:hover { border-color: #378ADD; background: #EBF4FC; }
   .op-card.active { border-color: #185FA5; background: #EBF4FC; }
@@ -221,6 +221,11 @@
         <svg width="28" height="28" fill="none" stroke="#BA7517" stroke-width="1.8" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         <div class="op-title">Edit Existing Records</div>
         <div class="op-desc">Bulk-update field values in existing KoboToolbox submissions via API</div>
+      </div>
+      <div class="op-card" id="op-delete" onclick="setOperation('delete')">
+        <svg width="28" height="28" fill="none" stroke="#C0392B" stroke-width="1.8" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+        <div class="op-title">Bulk Delete</div>
+        <div class="op-desc">Permanently delete submissions from KoboToolbox by ID — irreversible</div>
       </div>
       <div class="op-card" id="op-perms" onclick="setOperation('perms')">
         <svg width="28" height="28" fill="none" stroke="#6B4EAD" stroke-width="1.8" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
@@ -404,6 +409,24 @@
           &#9432; Upload an Excel file below and select the column containing usernames.
         </div>
       </div>
+
+      <!-- ID source — shown only for Bulk Delete -->
+      <div id="delete-id-source-wrap" style="display:none;margin-bottom:1rem">
+        <p style="font-size:12px;font-weight:600;color:#555;margin-bottom:.4rem">Submission IDs to delete:</p>
+        <div class="radio-toggle">
+          <label><input type="radio" name="delete-id-source" value="excel" checked onchange="onDeleteSourceChange()"> From Excel file (_id column)</label>
+          <label><input type="radio" name="delete-id-source" value="text" onchange="onDeleteSourceChange()"> Enter manually</label>
+        </div>
+        <div id="delete-source-text-upload" style="display:none;margin-top:.5rem">
+          <textarea id="delete-ids-text" rows="3" placeholder="Enter submission IDs separated by spaces or new lines…"
+            style="width:100%;font-size:13px;padding:8px 10px;border:1px solid #ddd;border-radius:8px;background:#fafaf8;outline:none;resize:vertical;font-family:monospace;line-height:1.5"
+            oninput="updateDeleteIdCount()"></textarea>
+          <p id="delete-id-count" style="font-size:11px;color:#888;margin-top:3px"></p>
+        </div>
+        <div id="delete-source-excel-hint" style="font-size:12px;color:#888;margin-top:.35rem">
+          &#9432; Upload an Excel file below with a <strong>_id</strong> column containing submission IDs.
+        </div>
+      </div>
       <div class="upload-zone" id="upload-zone" onclick="document.getElementById('hidden-file').click()">
         <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
         <p id="upload-label">Click or drag &amp; drop your .xlsx file here</p>
@@ -451,7 +474,8 @@
       <div id="action-submit">
         <!-- ZIP Export — only supported method for new submissions on KoboToolbox EU -->
         <div id="mode-csv">
-          <div class="info-box success" style="margin-bottom:1rem">&#9432; Exports rows as ODK XML instances in a ZIP file. Upload to KoboToolbox's bulk-submission-form — no API restrictions, no CORS issues.</div>
+          <div class="info-box success" style="margin-bottom:.75rem">&#9432; Exports rows as ODK XML instances in a ZIP file. Upload to KoboToolbox's bulk-submission-form — no API restrictions, no CORS issues.</div>
+          <div class="info-box warning" style="margin-bottom:1rem">&#9888; <strong>Known KoboToolbox issue:</strong> The bulk-submission-form may create duplicate records in some cases, even when uploading the same ZIP only once. This is a confirmed server-side bug. To minimise risk: wait for the full confirmation message after each upload before closing the page, and avoid re-uploading if you see a timeout — the first upload may have succeeded silently. Use the <strong>Bulk Delete</strong> operation to remove any duplicates if they occur.</div>
           <div class="field-row">
             <label>KoboToolbox username</label>
             <input type="text" id="kobo-username" placeholder="Your KoboToolbox username…" />
@@ -526,6 +550,41 @@
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Pause
           </button>
           <button class="btn-cancel" onclick="cancelEdits()">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>Cancel
+          </button>
+        </div>
+      </div>
+
+      <!-- Delete action -->
+      <div id="action-delete" style="display:none">
+        <div class="info-box error" style="margin-bottom:1rem">
+          &#9888; <strong>This operation permanently deletes submissions from KoboToolbox. It cannot be undone.</strong>
+          Uses <code style="font-size:11px;background:#fcebeb;padding:1px 5px;border-radius:4px">DELETE /api/v2/assets/{uid}/data/bulk/</code>.
+        </div>
+
+        <!-- Excel source: column selector + row range -->
+        <div id="delete-source-excel">
+          <div class="field-row">
+            <label>ID column</label>
+            <select id="delete-id-col"></select>
+          </div>
+          <div class="field-row">
+            <label>Rows to delete</label>
+            <select id="row-range-delete"><option value="all">All rows</option><option value="range">Custom range…</option></select>
+          </div>
+          <div id="range-inputs-delete" style="display:none;margin-bottom:8px">
+            <div class="field-row"><label>From row</label><input type="number" id="range-from-delete" value="1" min="1" style="width:80px;flex:none" /></div>
+            <div class="field-row"><label>To row</label><input type="number" id="range-to-delete" value="70" min="1" style="width:80px;flex:none" /></div>
+          </div>
+        </div>
+
+        <button class="btn-primary" id="delete-btn" onclick="startDelete()" disabled
+          style="background:#C0392B;margin-top:.75rem" onmouseover="this.style.background='#922b21'" onmouseout="this.style.background='#C0392B'">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+          Delete submissions
+        </button>
+        <div class="ctrl-row" id="ctrl-row-delete" style="display:none">
+          <button class="btn-cancel" onclick="cancelDelete()">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>Cancel
           </button>
         </div>
@@ -675,7 +734,7 @@
 <footer style="text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:#bbb">
   Brought to you by <a href="mailto:hammadibrahim@hotmail.com" style="color:#888;font-weight:600;text-decoration:none;border-bottom:1px dotted #bbb">Ibrahim Hammad</a>
   &nbsp;&nbsp;|&nbsp;&nbsp;
-  <span style="color:#ccc">v 20260810.04</span>
+  <span style="color:#bbb">v 20260904.01</span>
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -1135,16 +1194,16 @@ function loadMainSheet() {
 
   // Update all "To row" inputs with actual row count
   const count = mainData.length;
-  ['range-to','range-to-csv','range-to-edit','range-to-perms'].forEach(id => {
+  ['range-to','range-to-csv','range-to-edit','range-to-perms','range-to-delete'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = count;
   });
   // Reset all range dropdowns to "All rows" and hide range inputs
-  ['row-range','row-range-csv','row-range-edit','row-range-perms'].forEach(id => {
+  ['row-range','row-range-csv','row-range-edit','row-range-perms','row-range-delete'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = 'all';
   });
-  ['range-inputs','range-inputs-csv','range-inputs-edit','range-inputs-perms'].forEach(id => {
+  ['range-inputs','range-inputs-csv','range-inputs-edit','range-inputs-perms','range-inputs-delete'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
@@ -1320,6 +1379,10 @@ document.addEventListener('change', function(e) {
   if (e.target.id === 'row-range-perms') {
     document.getElementById('range-inputs-perms').style.display = e.target.value === 'range' ? 'block' : 'none';
     document.getElementById('range-to-perms').value = mainData.length || 1;
+  }
+  if (e.target.id === 'row-range-delete') {
+    document.getElementById('range-inputs-delete').style.display = e.target.value === 'range' ? 'block' : 'none';
+    document.getElementById('range-to-delete').value = mainData.length || 1;
   }
 });
 
@@ -1748,6 +1811,7 @@ function setOperation(op) {
   currentOp = op;
   document.getElementById('op-submit').classList.toggle('active', op === 'submit');
   document.getElementById('op-edit').classList.toggle('active', op === 'edit');
+  document.getElementById('op-delete').classList.toggle('active', op === 'delete');
   document.getElementById('op-perms').classList.toggle('active', op === 'perms');
   document.getElementById('op-check').classList.toggle('active', op === 'check');
   document.getElementById('badge-1').classList.add('done');
@@ -1761,15 +1825,29 @@ function setOperation(op) {
   document.getElementById('form-selector').style.display    = (op === 'perms' || op === 'check') ? 'none' : (connVerified ? 'block' : 'none');
   document.getElementById('action-submit').style.display    = op === 'submit' ? 'block' : 'none';
   document.getElementById('action-edit').style.display      = op === 'edit'   ? 'block' : 'none';
+  document.getElementById('action-delete').style.display    = op === 'delete' ? 'block' : 'none';
   document.getElementById('action-perms').style.display     = op === 'perms'  ? 'block' : 'none';
   document.getElementById('action-check').style.display     = op === 'check'  ? 'block' : 'none';
   document.getElementById('edit-upload-hint').style.display = op === 'edit'   ? 'block' : 'none';
   document.getElementById('perms-username-source-wrap').style.display = op === 'perms' ? 'block' : 'none';
+  document.getElementById('delete-id-source-wrap').style.display      = op === 'delete' ? 'block' : 'none';
+  // Delete upload hint - created dynamically once
+  let delHint = document.getElementById('delete-upload-hint');
+  if (!delHint) {
+    delHint = document.createElement('div');
+    delHint.id = 'delete-upload-hint';
+    delHint.className = 'info-box info';
+    delHint.style.marginBottom = '1rem';
+    delHint.innerHTML = '&#9888; Your Excel file must include a <strong>_id</strong> column containing the submission IDs to delete.';
+    const uz = document.getElementById('upload-zone');
+    if (uz) uz.parentNode.insertBefore(delHint, uz);
+  }
+  delHint.style.display = op === 'delete' ? 'block' : 'none';
 
   // Hide upload card entirely for check operation
   const uploadCard = document.getElementById('badge-upload')?.closest('.card');
-  if (uploadCard) uploadCard.style.display = op === 'check' ? 'none' : 'block';
-  document.getElementById('sec-map').style.display = (op === 'perms' || op === 'check') ? 'none' : 'block';
+  if (uploadCard) uploadCard.style.display = (op === 'check') ? 'none' : 'block';
+  document.getElementById('sec-map').style.display = (op === 'perms' || op === 'check' || op === 'delete') ? 'none' : 'block';
   document.getElementById('sec-check-results').style.display = 'none';
 
   // Step numbering
@@ -1781,42 +1859,50 @@ function setOperation(op) {
     document.getElementById('badge-upload').textContent = '4';
     document.getElementById('badge-map').textContent    = '5';
     document.getElementById('badge-action').textContent = '6';
+  } else if (op === 'delete') {
+    document.getElementById('badge-upload').textContent = '4';
+    document.getElementById('badge-action').textContent = '5';
   } else if (op === 'perms') {
     document.getElementById('badge-perms-forms').textContent = '4';
     document.getElementById('badge-upload').textContent      = '5';
     document.getElementById('badge-action').textContent      = '6';
-  } else { // check: 3=conn, 4=usernames, 5=action
+  } else { // check
     document.getElementById('badge-action').textContent = '5';
   }
 
   // Upload card title
   document.getElementById('upload-card-title').textContent =
-    op === 'perms' ? 'KoboToolbox Usernames' : 'Upload Excel file';
+    op === 'perms'  ? 'KoboToolbox Usernames' :
+    op === 'delete' ? 'Upload Excel file' : 'Upload Excel file';
 
   // Guide
   document.getElementById('guide-submit').style.display = op === 'submit' ? 'block' : 'none';
   document.getElementById('guide-edit').style.display   = op === 'edit'   ? 'block' : 'none';
-  document.getElementById('guide-perms').style.display  = (op === 'perms' || op === 'check') ? 'block' : 'none';
+  document.getElementById('guide-perms').style.display  = (op === 'perms' || op === 'check' || op === 'delete') ? 'block' : 'none';
   document.getElementById('guide-title').textContent =
     op === 'submit' ? 'Setup guide — Cloudflare Worker required for connection'
     : op === 'edit' ? 'Setup guide — Cloudflare Worker required for edit operations'
     : op === 'perms' ? 'Setup guide — Cloudflare Worker required for managing permissions'
+    : op === 'delete' ? 'Setup guide — Cloudflare Worker required for delete operations'
     : 'Setup guide — Cloudflare Worker required for checking access';
   document.getElementById('guide-intro').textContent =
     op === 'submit' ? 'KoboToolbox blocks direct browser requests for the connection test. A Cloudflare Worker proxy relays these requests — the ZIP export itself then runs entirely client-side.'
     : op === 'edit' ? 'Edit operations call the KoboToolbox API directly from your browser. A Cloudflare Worker proxy is required to relay these requests.'
     : op === 'perms' ? 'Assigning permissions calls the KoboToolbox API directly from your browser. A Cloudflare Worker proxy is required to relay these requests.'
+    : op === 'delete' ? 'Deleting submissions calls the KoboToolbox API directly from your browser. A Cloudflare Worker proxy is required to relay these requests.'
     : 'Checking user access calls the KoboToolbox API for each form. A Cloudflare Worker proxy is required to relay these requests.';
 
   document.getElementById('action-title').textContent =
     op === 'submit' ? 'Export / Submit'
     : op === 'edit' ? 'Apply edits'
+    : op === 'delete' ? 'Delete submissions'
     : op === 'perms' ? 'Assign permissions'
     : 'Check access';
 
   refreshSubmitBtn();
   if (op === 'perms') { populateUsernameColumn(); populatePermsFormList(); }
   if (op === 'check' && connVerified) document.getElementById('check-btn').disabled = false;
+  if (op === 'delete') populateDeleteIdColumn();
   document.getElementById('steps-container').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
 }
@@ -2087,6 +2173,154 @@ async function startEdits() {
   document.getElementById('sec-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// ── Bulk Delete ────────────────────────────────────────────────
+function populateDeleteIdColumn() {
+  const sel = document.getElementById('delete-id-col');
+  if (!sel || !mainData.length) return;
+  const cols = Object.keys(mainData[0]);
+  sel.innerHTML = cols.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+  const guess = cols.find(c => c === '_id' || c.toLowerCase() === '_id');
+  if (guess) sel.value = guess;
+}
+
+function onDeleteSourceChange() {
+  const src = document.querySelector('input[name="delete-id-source"]:checked').value;
+  const isText = src === 'text';
+  document.getElementById('delete-source-text-upload').style.display = isText  ? 'block' : 'none';
+  document.getElementById('delete-source-excel-hint').style.display  = isText  ? 'none'  : 'block';
+  document.getElementById('delete-source-excel').style.display       = isText  ? 'none'  : 'block';
+  // Hide drop zone when manual entry selected
+  document.getElementById('upload-zone').style.display    = isText ? 'none' : 'block';
+  document.getElementById('sheet-selector').style.display = isText ? 'none' : (mainData.length ? 'block' : 'none');
+  document.getElementById('preview-wrap').style.display   = isText ? 'none' : (mainData.length ? 'block' : 'none');
+  refreshSubmitBtn();
+}
+
+function updateDeleteIdCount() {
+  const raw = document.getElementById('delete-ids-text').value;
+  const count = raw.trim().split(/[\s,]+/).filter(Boolean).length;
+  const el = document.getElementById('delete-id-count');
+  if (el) el.textContent = count ? `${count} ID${count !== 1 ? 's' : ''}` : '';
+}
+
+let deleteCancelled = false;
+
+function cancelDelete() {
+  if (!confirm('Cancel delete operation? Records already deleted cannot be restored.')) return;
+  deleteCancelled = true;
+  document.getElementById('ctrl-row-delete').style.display = 'none';
+  document.getElementById('delete-btn').disabled = false;
+  document.getElementById('delete-btn').innerHTML =
+    '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg> Delete submissions';
+}
+
+async function startDelete() {
+  const token   = document.getElementById('api-token').value.trim();
+  const formUid = document.getElementById('form-uid').value.trim();
+  const serverUrl = getServerUrl();
+  if (!token || !formUid) { alert('Please complete connection first.'); return; }
+
+  // Collect IDs from chosen source
+  const src = document.querySelector('input[name="delete-id-source"]:checked').value;
+  let ids = [];
+  if (src === 'excel') {
+    if (!mainData.length) { alert('Please upload an Excel file first.'); return; }
+    const idCol = document.getElementById('delete-id-col').value;
+    let rows = mainData;
+    if (document.getElementById('row-range-delete').value === 'range') {
+      const from = Math.max(0, parseInt(document.getElementById('range-from-delete').value)-1)||0;
+      const to   = parseInt(document.getElementById('range-to-delete').value)||rows.length;
+      rows = rows.slice(from, to);
+    }
+    ids = [...new Set(rows.map(r => Number(r[idCol])).filter(id => id && !isNaN(id)))];
+  } else {
+    const raw = document.getElementById('delete-ids-text').value;
+    ids = [...new Set(raw.trim().split(/[\s,]+/).filter(Boolean).map(Number).filter(id => !isNaN(id)))];
+  }
+
+  if (!ids.length) { alert('No valid submission IDs found.'); return; }
+
+  // Typed confirmation modal
+  const confirmed = await showModal({
+    title: '⚠️ Confirm permanent deletion',
+    body: `You are about to permanently delete <strong>${ids.length} submission${ids.length !== 1 ? 's' : ''}</strong> from KoboToolbox.<br><br>
+           <strong>This action cannot be undone.</strong><br><br>
+           Type <strong>DELETE</strong> in the box below to confirm:
+           <br><br><input id="delete-confirm-input" type="text" placeholder="Type DELETE to confirm"
+             style="width:100%;padding:8px 10px;border:2px solid #E24B4A;border-radius:8px;font-size:14px;font-weight:600;outline:none;margin-top:4px">`,
+    buttons: [
+      { label: 'Cancel', style: 'secondary', value: false },
+      { label: 'Delete permanently', style: 'danger', value: true }
+    ]
+  });
+
+  if (!confirmed) return;
+  const typed = document.getElementById('delete-confirm-input')?.value?.trim();
+  if (typed !== 'DELETE') {
+    await showModal({
+      title: 'Confirmation failed',
+      body: 'You did not type DELETE correctly. The operation has been cancelled.',
+      buttons: [{ label: 'OK', style: 'primary', value: true }]
+    });
+    return;
+  }
+
+  // Execute deletion in batches of 100
+  const BATCH = 100;
+  const batches = [];
+  for (let i = 0; i < ids.length; i += BATCH) batches.push(ids.slice(i, i + BATCH));
+
+  deleteCancelled = false;
+  logEntries = []; failedRows = [];
+  document.getElementById('sec-results').style.display = 'block';
+  document.getElementById('log-wrap').innerHTML = '';
+  document.getElementById('retry-btn').style.display = 'none';
+  updateStats(0, 0, 0, batches.length);
+  document.getElementById('delete-btn').disabled = true;
+  document.getElementById('delete-btn').innerHTML = '&#9654; Deleting…';
+  document.getElementById('ctrl-row-delete').style.display = 'flex';
+
+  const url = `${serverUrl}/api/v2/assets/${formUid}/data/bulk/`;
+  let ok = 0, err = 0;
+
+  for (let bi = 0; bi < batches.length; bi++) {
+    if (deleteCancelled) break;
+    const batch = batches[bi];
+    const batchStart = bi * BATCH + 1;
+    const batchEnd   = Math.min((bi + 1) * BATCH, ids.length);
+
+    try {
+      const resp = await fetch(url, {
+        method: 'DELETE',
+        headers: { 'Authorization': 'Token '+token, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ payload: { submission_ids: batch } })
+      });
+      if (!resp.ok) {
+        const j = await resp.json().catch(() => ({}));
+        throw new Error(j.detail || resp.status);
+      }
+      ok++;
+      addLog(bi+1, 'ok', `Batch ${bi+1}/${batches.length} — IDs ${batchStart}–${batchEnd} deleted (${batch.length} records)`);
+      logEntries.push({row:bi+1, status:'ok', message:`Batch ${bi+1} deleted`});
+    } catch(e) {
+      err++;
+      addLog(bi+1, 'err', `Batch ${bi+1}/${batches.length} — IDs ${batchStart}–${batchEnd}: ${e.message}`);
+      logEntries.push({row:bi+1, status:'error', message:`Batch ${bi+1}: ${e.message}`});
+      failedRows.push(...batch.map(id => ({ _id: id })));
+    }
+    updateStats(bi+1, ok, err, batches.length);
+    if (bi < batches.length-1 && !deleteCancelled) await sleep(300);
+  }
+
+  document.getElementById('ctrl-row-delete').style.display = 'none';
+  document.getElementById('delete-btn').disabled = false;
+  document.getElementById('delete-btn').innerHTML = deleteCancelled
+    ? '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg> Delete submissions'
+    : '&#10003; Done';
+  if (failedRows.length) document.getElementById('retry-btn').style.display = 'flex';
+  document.getElementById('sec-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 // ── Check User Access ─────────────────────────────────────────
 let checkResults = []; // [{formName, formUid, username, permissions:[]}]
 
@@ -2245,6 +2479,12 @@ function refreshSubmitBtn() {
     const src = document.querySelector('input[name="username-source"]:checked');
     const isManual = src && src.value === 'text';
     permsEl.disabled = !hasConn || (!isManual && !hasData);
+  }
+  const deleteEl = document.getElementById('delete-btn');
+  if (deleteEl && !deleteEl.innerHTML.includes('Deleting')) {
+    const delSrc = document.querySelector('input[name="delete-id-source"]:checked');
+    const isManualDel = delSrc && delSrc.value === 'text';
+    deleteEl.disabled = !hasConn || (!isManualDel && !hasData);
   }
 }
 
