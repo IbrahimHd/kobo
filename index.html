@@ -734,7 +734,7 @@
 <footer style="text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:#bbb">
   Brought to you by <a href="mailto:hammadibrahim@hotmail.com" style="color:#888;font-weight:600;text-decoration:none;border-bottom:1px dotted #bbb">Ibrahim Hammad</a>
   &nbsp;&nbsp;|&nbsp;&nbsp;
-  <span style="color:#bbb">v 20260907.01</span>
+  <span style="color:#bbb">v 20260907.02</span>
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -910,7 +910,7 @@ function resetConnStatus() {
   document.getElementById('form-meta').style.display = 'none';
   document.getElementById('badge-1').classList.remove('done');
   refreshSubmitBtn();
-  if (mainData.length && currentOp !== 'perms') buildMapping();
+  if (mainData.length && currentOp !== 'perms' && currentOp !== 'delete') buildMapping();
 }
 
 function setConnUI(state, text, iconChar) {
@@ -1064,7 +1064,7 @@ async function testConnection() {
     refreshSubmitBtn();
 
     // Re-build mapping with kobo field names now available
-    if (mainData.length && currentOp !== 'perms') buildMapping();
+    if (mainData.length && currentOp !== 'perms' && currentOp !== 'delete') buildMapping();
 
   } catch(e) {
     setConnUI('error', 'Connection failed');
@@ -1185,7 +1185,7 @@ function loadMainSheet() {
   const name = document.getElementById('main-sheet-select').value;
   mainData = XLSX.utils.sheet_to_json(workbook.Sheets[name], { defval: '' });
   showPreview(mainData);
-  if (currentOp !== 'perms') {
+  if (currentOp !== 'perms' && currentOp !== 'delete') {
     buildMapping();
     document.getElementById('sec-map').style.display = 'block';
   } else {
@@ -1213,6 +1213,8 @@ function loadMainSheet() {
 
   // Populate username column selector if in permissions mode
   if (currentOp === 'perms') populateUsernameColumn();
+  // Populate ID column selector if in delete mode
+  if (currentOp === 'delete') populateDeleteIdColumn();
 
   refreshSubmitBtn();
 }
