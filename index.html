@@ -734,7 +734,7 @@
 <footer style="text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:#bbb">
   Brought to you by <a href="mailto:hammadibrahim@hotmail.com" style="color:#888;font-weight:600;text-decoration:none;border-bottom:1px dotted #bbb">Ibrahim Hammad</a>
   &nbsp;&nbsp;|&nbsp;&nbsp;
-  <span style="color:#bbb">v 20260921.02</span>
+  <span style="color:#bbb">v 20260922.01</span>
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -762,16 +762,24 @@ async function connectAndLoadForms() {
   refreshSubmitBtn();
 
   try {
-    const url = `${server}/api/v2/assets/?asset_type=survey&page_size=1000&format=json`;
-    const resp = await fetch(url, {
-      headers: { 'Authorization': 'Token ' + token, 'Accept': 'application/json' }
-    });
-    if (resp.status === 401) throw new Error('Invalid or expired API token');
-    if (resp.status === 403) throw new Error('Permission denied — check your token');
-    if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
+    let allResults = [];
+    let nextUrl = `${server}/api/v2/assets/?asset_type=survey&page_size=100&format=json`;
+    while (nextUrl) {
+      const resp = await fetch(nextUrl, {
+        headers: { 'Authorization': 'Token ' + token, 'Accept': 'application/json' }
+      });
+      if (resp.status === 401) throw new Error('Invalid or expired API token');
+      if (resp.status === 403) throw new Error('Permission denied — check your token');
+      if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
+      const data = await resp.json();
+      allResults = allResults.concat(data.results || []);
+      if (data.next) {
+        try { nextUrl = server + new URL(data.next).pathname + new URL(data.next).search; }
+        catch(e) { nextUrl = null; }
+      } else { nextUrl = null; }
+    }
 
-    const data = await resp.json();
-    allForms = (data.results || []).map(f => ({
+    allForms = allResults.map(f => ({
       uid:    f.uid,
       name:   f.name || f.uid,
       status: f.deployment_status || ''
@@ -2365,7 +2373,7 @@ async function startCheckAccess() {
   for (const form of allForms) {
     try {
       let assignments = [];
-      let nextUrl = `${proxyBase}/api/v2/assets/${form.uid}/permission-assignments/?page_size=200`;
+      let nextUrl = `${proxyBase}/api/v2/assets/${form.uid}/permission-assignments/?page_size=100`;
       while (nextUrl) {
         const resp = await fetch(nextUrl, {
           headers: { 'Authorization': 'Token '+token, 'Accept': 'application/json' }
@@ -2667,7 +2675,7 @@ async function startPermissions() {
 
   for (const form of selectedForms) {
     if (permsCancelled) break;
-    const listUrl  = `${serverUrl}/api/v2/assets/${form.uid}/permission-assignments/?page_size=200`;
+    const listUrl  = `${serverUrl}/api/v2/assets/${form.uid}/permission-assignments/?page_size=100`;
     const permUrl  = `${koboServer}/api/v2/permissions/${permCode}/`;
 
     for (let i = 0; i < usernames.length; i++) {
