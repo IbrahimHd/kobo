@@ -139,6 +139,13 @@
   .modal-btn.secondary:hover { background:#e4e2dc; }
   .modal-btn.danger { background:#FCEBEB; color:#A32D2D; border:1px solid #E24B4A; }
   .modal-btn.danger:hover { background:#f8d4d4; }
+  /* Toggle switch */
+  .toggle-switch { position:relative; display:inline-block; width:36px; height:20px; flex-shrink:0; }
+  .toggle-switch input { opacity:0; width:0; height:0; position:absolute; }
+  .toggle-switch .slider { position:absolute; inset:0; background:#ddd; border-radius:20px; cursor:pointer; transition:background .2s; }
+  .toggle-switch .slider:before { content:''; position:absolute; width:14px; height:14px; left:3px; top:3px; background:#fff; border-radius:50%; transition:transform .2s; }
+  .toggle-switch input:checked + .slider { background:#185FA5; }
+  .toggle-switch input:checked + .slider:before { transform:translateX(16px); }
   /* Permission action segmented control */
   .seg-control { display:flex; border:1.5px solid #6B4EAD; border-radius:9px; overflow:hidden; margin-bottom:.75rem; }
   .seg-btn { flex:1; padding:9px 12px; font-size:13px; font-weight:600; border:none; background:#fff; color:#6B4EAD; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:7px; transition:background .15s, color .15s; }
@@ -464,12 +471,14 @@
     <!-- Step 6: Column mapping -->
     <div class="card" id="sec-map">
       <div class="card-title"><span class="step-badge" id="badge-map">6</span> Column mapping</div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
-        <p style="font-size:12px;color:#888;margin:0">Map your Excel columns to Kobo field names. Unmatched columns are skipped by default.</p>
-        <label style="display:flex;align-items:center;gap:7px;font-size:12px;color:#555;white-space:nowrap;cursor:pointer;margin-left:1rem">
-          <input type="checkbox" id="allow-non-match" onchange="buildMapping()" style="accent-color:#185FA5;width:14px;height:14px">
-          Allow custom names
+      <p style="font-size:12px;color:#888;margin-bottom:.6rem">Map your Excel columns to Kobo field names. Unmatched columns are skipped by default.</p>
+      <div class="field-row" style="margin-bottom:.85rem">
+        <label>Allow custom names</label>
+        <label class="toggle-switch">
+          <input type="checkbox" id="allow-non-match" onchange="document.getElementById('allow-non-match-val').textContent=this.checked?'On':'Off';buildMapping()">
+          <span class="slider"></span>
         </label>
+        <span id="allow-non-match-val" style="font-size:13px;min-width:32px">Off</span>
       </div>
       <div id="map-list">
         <p style="font-size:13px;color:#aaa;text-align:center;padding:1.25rem 0">
@@ -506,8 +515,9 @@
           </div>
           <div class="field-row">
             <label>ZIP batch size</label>
-            <input type="number" id="zip-batch-size" value="50" min="1" max="500" style="width:80px;flex:none" />
-            <span style="font-size:12px;color:#aaa;margin-left:8px">submissions per ZIP file</span>
+            <input type="range" min="10" max="500" step="10" value="50" id="zip-batch-size"
+              oninput="document.getElementById('zip-batch-val').textContent=this.value+' rows'" style="flex:1" />
+            <span style="font-size:13px;min-width:64px;text-align:right" id="zip-batch-val">50 rows</span>
           </div>
           <button class="btn-primary" id="export-btn" onclick="exportZip()" disabled>
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -752,7 +762,7 @@
 <footer style="text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:#bbb">
   Brought to you by <a href="mailto:hammadibrahim@hotmail.com" style="color:#888;font-weight:600;text-decoration:none;border-bottom:1px dotted #bbb">Ibrahim Hammad</a>
   &nbsp;&nbsp;|&nbsp;&nbsp;
-  <span style="color:#bbb">v 20261016.01</span>
+  <span style="color:#bbb">v 20261016.02</span>
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -799,8 +809,8 @@ async function connectAndLoadForms() {
 
     allForms = allResults.map(f => ({
       uid:    f.uid,
-      name:   f.name || f.uid,
-      status: f.deployment_status || ''
+      name:   (f.name && f.name.trim()) || (f.name__ && f.name__.trim()) || f.uid,
+      status: f.deployment_status || f.asset_status || ''
     })).sort((a, b) => a.name.localeCompare(b.name));
 
     if (!allForms.length) throw new Error('No forms found for this token');
