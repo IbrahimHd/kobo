@@ -776,7 +776,7 @@ let allForms = [];
 
 async function connectAndLoadForms() {
   const token  = document.getElementById('api-token').value.trim();
-  const server = getServerUrl();
+  const server = getKoboServer(); //getServerUrl();
   if (!token)  { showInfoBox('error', 'Please enter your API token.'); return; }
   if (!server) { showInfoBox('error', 'Please enter your Cloudflare Proxy URL.'); return; }
 
