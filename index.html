@@ -464,7 +464,13 @@
     <!-- Step 6: Column mapping -->
     <div class="card" id="sec-map">
       <div class="card-title"><span class="step-badge" id="badge-map">6</span> Column mapping</div>
-      <p style="font-size:12px;color:#888;margin-bottom:.85rem">Map your Excel columns to Kobo field names. Leave "— skip —" to exclude a column.</p>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+        <p style="font-size:12px;color:#888;margin:0">Map your Excel columns to Kobo field names. Unmatched columns are skipped by default.</p>
+        <label style="display:flex;align-items:center;gap:7px;font-size:12px;color:#555;white-space:nowrap;cursor:pointer;margin-left:1rem">
+          <input type="checkbox" id="allow-non-match" onchange="buildMapping()" style="accent-color:#185FA5;width:14px;height:14px">
+          Allow custom names
+        </label>
+      </div>
       <div id="map-list">
         <p style="font-size:13px;color:#aaa;text-align:center;padding:1.25rem 0">
           <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="display:inline-block;vertical-align:-4px;margin-right:6px;color:#ccc"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
@@ -497,6 +503,11 @@
           <div id="range-inputs-csv">
             <div class="field-row"><label>From row</label><input type="number" id="range-from-csv" value="1" min="1" style="width:80px;flex:none" /></div>
             <div class="field-row"><label>To row</label><input type="number" id="range-to-csv" value="70" min="1" style="width:80px;flex:none" /></div>
+          </div>
+          <div class="field-row">
+            <label>ZIP batch size</label>
+            <input type="number" id="zip-batch-size" value="50" min="1" max="500" style="width:80px;flex:none" />
+            <span style="font-size:12px;color:#aaa;margin-left:8px">submissions per ZIP file</span>
           </div>
           <button class="btn-primary" id="export-btn" onclick="exportZip()" disabled>
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -741,7 +752,7 @@
 <footer style="text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:#bbb">
   Brought to you by <a href="mailto:hammadibrahim@hotmail.com" style="color:#888;font-weight:600;text-decoration:none;border-bottom:1px dotted #bbb">Ibrahim Hammad</a>
   &nbsp;&nbsp;|&nbsp;&nbsp;
-  <span style="color:#bbb">v 20260922.03</span>
+  <span style="color:#bbb">v 20261016.01</span>
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -999,13 +1010,17 @@ async function testConnection() {
     koboEnketoUrl = '';
 
     // id_string can live in multiple places depending on server version — try all
+    // deployment__identifier may be a full URL for archived forms — extract the last path segment
+    const deployId = asset.deployment__identifier
+      ? asset.deployment__identifier.replace(/\/$/, '').split('/').pop()
+      : null;
     koboIdString =
       asset.id_string ||                          // top-level (most reliable)
-      asset.deployment__identifier ||             // deployment identifier
       (asset.content && asset.content.settings &&
         (Array.isArray(asset.content.settings)
           ? asset.content.settings[0]?.id_string
           : asset.content.settings?.id_string)) ||
+      deployId ||                                 // last path segment of deployment identifier
       asset.uid ||                                // last resort
       formUid;
 
@@ -1263,24 +1278,28 @@ function buildMapping() {
 
   // Build kobo options HTML (grouped if fields available)
   function koboOptionsHtml(colName) {
+    const allowCustom = document.getElementById('allow-non-match')?.checked || false;
     let opts = '';
     if (koboFields.length > 0) {
-      // Try to auto-match by exact name
       const exactMatch = koboFields.find(f => f.name === colName);
-      // As-is option (matches exact column name)
-      opts += `<option value="${escHtml(colName)}" ${exactMatch ? 'selected' : ''}>${escHtml(colName)} (as-is)</option>`;
-      opts += `<option value="__skip__">— skip —</option>`;
+      // Blank/skip option — selected by default if no match found
+      opts += `<option value="__skip__" ${!exactMatch ? 'selected' : ''}>— skip —</option>`;
+      if (allowCustom) {
+        opts += `<option value="${escHtml(colName)}">${escHtml(colName)} (as-is)</option>`;
+      }
       opts += `<optgroup label="── Kobo fields ──">`;
       koboFields.forEach(f => {
-        const sel = (exactMatch && f.name === colName) ? '' : (f.name === colName ? 'selected' : '');
+        const sel = exactMatch && f.name === colName ? 'selected' : '';
         opts += `<option value="${escHtml(f.name)}" ${sel}>${escHtml(f.name)}${f.label !== f.name ? ' — ' + escHtml(f.label) : ''}</option>`;
       });
       opts += `</optgroup>`;
-      opts += `<option value="__custom__">Custom name…</option>`;
+      if (allowCustom) opts += `<option value="__custom__">Custom name…</option>`;
     } else {
-      opts += `<option value="${escHtml(colName)}">${escHtml(colName)}</option>`;
-      opts += `<option value="__skip__">— skip —</option>`;
-      opts += `<option value="__custom__">Custom name…</option>`;
+      opts += `<option value="__skip__" selected>— skip —</option>`;
+      if (allowCustom) {
+        opts += `<option value="${escHtml(colName)}">${escHtml(colName)}</option>`;
+        opts += `<option value="__custom__">Custom name…</option>`;
+      }
     }
     return opts;
   }
@@ -1502,7 +1521,7 @@ async function exportZip() {
   const formUuid    = koboFormUuid || '';
   const versionAttr = koboVersion ? ` version="${escXml(koboVersion)}"` : '';
   const nowISO      = new Date().toISOString().replace('Z', '+00:00');
-  const ZIP_CHUNK   = 200; // max submissions per ZIP — keeps server processing safe
+  const ZIP_CHUNK   = Math.max(1, parseInt(document.getElementById('zip-batch-size').value) || 50);
 
   const systemFields = ['start','end','username','__version__','_version_',
     'meta/rootUuid','meta/instanceID','formhub/uuid','_id','_uuid',
