@@ -776,7 +776,7 @@ let allForms = [];
 
 async function connectAndLoadForms() {
   const token  = document.getElementById('api-token').value.trim();
-  const server = getKoboServer(); //getServerUrl();
+  const server = getServerUrl();
   if (!token)  { showInfoBox('error', 'Please enter your API token.'); return; }
   if (!server) { showInfoBox('error', 'Please enter your Cloudflare Proxy URL.'); return; }
 
@@ -962,7 +962,7 @@ async function testConnection() {
   const token = document.getElementById('api-token').value.trim();
   const formUid = document.getElementById('form-uid').value.trim();
   if (!token || !formUid) return; // called internally after selectForm — silent if no UID yet
-  const server = getKoboServer(); //getServerUrl();
+  const server = getServerUrl();
   setConnUI('loading', 'Loading form…');
   document.getElementById('conn-info-box').style.display = 'none';
   document.getElementById('form-meta').style.display = 'none';
