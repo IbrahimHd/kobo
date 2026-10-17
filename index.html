@@ -962,7 +962,7 @@ async function testConnection() {
   const token = document.getElementById('api-token').value.trim();
   const formUid = document.getElementById('form-uid').value.trim();
   if (!token || !formUid) return; // called internally after selectForm — silent if no UID yet
-  const server = getServerUrl();
+  const server = getKoboServer(); //getServerUrl();
   setConnUI('loading', 'Loading form…');
   document.getElementById('conn-info-box').style.display = 'none';
   document.getElementById('form-meta').style.display = 'none';
