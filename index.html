@@ -314,7 +314,11 @@
       <!-- Step 3a: Credentials + Connect -->
       <div class="field-row">
         <label>API Token</label>
-        <input type="password" id="api-token" placeholder="Paste your API token…" oninput="resetConnStatus()" />
+        <div style="flex:1;position:relative">
+          <input type="password" id="api-token" placeholder="Paste your API token…" oninput="resetConnStatus()" autocomplete="new-password" spellcheck="false" style="width:100%;padding-right:36px;font-family:monospace;font-size:12px" />
+          <button type="button" onclick="const i=document.getElementById('api-token');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'👁':'🙈'" tabindex="-1"
+            style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;padding:0;line-height:1;color:#aaa">👁</button>
+        </div>
       </div>
       <div class="field-row">
         <label>Kobo Server</label>
@@ -762,7 +766,7 @@
 <footer style="text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:#bbb">
   Brought to you by <a href="mailto:hammadibrahim@hotmail.com" style="color:#888;font-weight:600;text-decoration:none;border-bottom:1px dotted #bbb">Ibrahim Hammad</a>
   &nbsp;&nbsp;|&nbsp;&nbsp;
-  <span style="color:#bbb">v 20261018.01</span>
+  <span style="color:#bbb">v 20261019.01</span>
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
