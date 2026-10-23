@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="referrer" content="no-referrer" />
 <title>KoboToolbox Management Tool</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23185FA5'/><ellipse cx='16' cy='10' rx='8' ry='3.5' fill='none' stroke='%23fff' stroke-width='2'/><path d='M8 10v5c0 1.93 3.58 3.5 8 3.5s8-1.57 8-3.5v-5' fill='none' stroke='%23fff' stroke-width='2'/><path d='M8 15v5c0 1.93 3.58 3.5 8 3.5s8-1.57 8-3.5v-5' fill='none' stroke='%23fff' stroke-width='2'/></svg>" />
 <style>
@@ -315,11 +314,7 @@
       <!-- Step 3a: Credentials + Connect -->
       <div class="field-row">
         <label>API Token</label>
-        <div style="flex:1;position:relative">
-          <input type="password" id="api-token" placeholder="Paste your API token…" oninput="resetConnStatus()" autocomplete="new-password" spellcheck="false" style="width:100%;padding-right:36px;font-family:monospace;font-size:12px" />
-          <button type="button" onclick="const i=document.getElementById('api-token');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'👁':'🙈'" tabindex="-1"
-            style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;padding:0;line-height:1;color:#aaa">👁</button>
-        </div>
+        <input type="password" id="api-token" placeholder="Paste your API token…" oninput="resetConnStatus()" />
       </div>
       <div class="field-row">
         <label>Kobo Server</label>
@@ -767,7 +762,7 @@
 <footer style="text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:#bbb">
   Brought to you by <a href="mailto:hammadibrahim@hotmail.com" style="color:#888;font-weight:600;text-decoration:none;border-bottom:1px dotted #bbb">Ibrahim Hammad</a>
   &nbsp;&nbsp;|&nbsp;&nbsp;
-  <span style="color:#bbb">v 20261021.01</span>
+  <span style="color:#bbb">v 20261023.01</span>
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
