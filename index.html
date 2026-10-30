@@ -762,7 +762,7 @@
 <footer style="text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:#bbb">
   Brought to you by <a href="mailto:hammadibrahim@hotmail.com" style="color:#888;font-weight:600;text-decoration:none;border-bottom:1px dotted #bbb">Ibrahim Hammad</a>
   &nbsp;&nbsp;|&nbsp;&nbsp;
-  <span style="color:#bbb">v 20261030.01</span>
+  <span style="color:#bbb">v 20261030.02</span>
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -874,6 +874,7 @@ async function selectForm(uid, name) {
     el.classList.toggle('selected', el.dataset.uid === uid)
   );
   document.getElementById('form-uid').value = uid;
+  if (!anyOperationRunning()) resetRunPanels();   // new form = fresh start
   // Fetch form details (fields, version, meta)
   await testConnection();
 }
@@ -1020,6 +1021,7 @@ async function testConnection() {
 
     // 3. Extract field names, id_string, version, Enketo URL and form UUID
     koboFields    = [];
+    koboNoteFields = [];
     koboFormUuid  = asset.uuid || asset.deployment__uuid || '';
     koboVersion   = asset.deployed_version_id || asset.version_id || '';
     koboEnketoUrl = '';
@@ -1867,7 +1869,38 @@ function downloadLog() {
 // ── Operation selector ────────────────────────────────────────
 let currentOp = null;
 
+const EDIT_BTN_HTML = '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Apply edits';
+const DELETE_BTN_HTML = '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg> Delete submissions';
+
+// True while any operation is mid-run (so we never wipe its progress panel)
+function anyOperationRunning() {
+  const lbl = id => (document.getElementById(id)?.innerHTML || '');
+  return running || editRunning || permsRunning ||
+    lbl('delete-btn').includes('Deleting') || lbl('check-btn').includes('Checking');
+}
+
+// Clears leftovers from a previous run: Results log, Access Report, "Done" button labels
+function resetRunPanels() {
+  document.getElementById('sec-results').style.display = 'none';
+  document.getElementById('log-wrap').innerHTML = '';
+  document.getElementById('retry-btn').style.display = 'none';
+  updateStats(0, 0, 0, 0);
+  logEntries = []; failedRows = [];
+
+  document.getElementById('check-results-head').innerHTML = '';
+  document.getElementById('check-results-body').innerHTML = '';
+  document.getElementById('check-status').textContent = '';
+  const exportBtn = document.getElementById('export-check-btn');
+  if (exportBtn) exportBtn.disabled = true;
+  checkResults = [];
+
+  document.getElementById('edit-btn').innerHTML = EDIT_BTN_HTML;
+  document.getElementById('delete-btn').innerHTML = DELETE_BTN_HTML;
+  setPermAction(document.getElementById('btn-perm-revoke').classList.contains('active') ? 'revoke' : 'add');
+}
+
 function setOperation(op) {
+  const opChanged = currentOp !== op;
   currentOp = op;
   document.getElementById('op-submit').classList.toggle('active', op === 'submit');
   document.getElementById('op-edit').classList.toggle('active', op === 'edit');
@@ -1909,6 +1942,8 @@ function setOperation(op) {
   if (uploadCard) uploadCard.style.display = (op === 'check') ? 'none' : 'block';
   document.getElementById('sec-map').style.display = (op === 'perms' || op === 'check' || op === 'delete') ? 'none' : 'block';
   document.getElementById('sec-check-results').style.display = 'none';
+  // A different operation was chosen: don't leave the previous one's results on screen
+  if (opChanged && !anyOperationRunning()) resetRunPanels();
 
   // Step numbering
   if (op === 'submit') {
@@ -2411,7 +2446,10 @@ async function startCheckAccess() {
   btn.innerHTML = '&#9654; Checking…';
 
   const statusEl = document.getElementById('check-status');
+  document.getElementById('sec-results').style.display = 'none';
   document.getElementById('sec-check-results').style.display = 'block';
+  const exportBtnCheck = document.getElementById('export-check-btn');
+  if (exportBtnCheck) exportBtnCheck.disabled = true;
   document.getElementById('check-results-body').innerHTML = '';
   document.getElementById('check-results-head').innerHTML = '';
   checkResults = [];
@@ -2538,7 +2576,7 @@ function refreshSubmitBtn() {
   const permsEl  = document.getElementById('perms-btn');
   if (submitEl) submitEl.disabled = !(hasConn && hasData);
   if (exportEl) exportEl.disabled = !hasData;
-  if (editEl)   editEl.disabled   = !(hasConn && hasData);
+  if (editEl && !editEl.innerHTML.includes('Applying')) editEl.disabled = !(hasConn && hasData);
   if (permsEl && !permsEl.innerHTML.includes('Assigning') && !permsEl.innerHTML.includes('Revoking')) {
     const src = document.querySelector('input[name="username-source"]:checked');
     const isManual = src && src.value === 'text';
