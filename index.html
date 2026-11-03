@@ -762,7 +762,7 @@
 <footer style="text-align:center;padding:1.5rem 0 2rem;font-size:12px;color:#bbb">
   Brought to you by <a href="mailto:hammadibrahim@hotmail.com" style="color:#888;font-weight:600;text-decoration:none;border-bottom:1px dotted #bbb">Ibrahim Hammad</a>
   &nbsp;&nbsp;|&nbsp;&nbsp;
-  <span style="color:#bbb">v 20261030.02</span>
+  <span style="color:#bbb">v 20261030.03</span>
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -847,8 +847,7 @@ function renderFormList(forms) {
   }
   const currentUid = document.getElementById('form-uid').value;
   list.innerHTML = forms.map(f => {
-    const safeName = f.name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    return `<div class="form-list-item${f.uid === currentUid ? ' selected' : ''}" onclick="selectForm('${f.uid}','${safeName}')" data-uid="${f.uid}">
+    return `<div class="form-list-item${f.uid === currentUid ? ' selected' : ''}" onclick="selectForm('${f.uid}')" data-uid="${f.uid}">
       <span class="form-name">${escHtml(f.name)}</span>
       <span class="form-uid">${f.uid}</span>
     </div>`;
@@ -869,7 +868,7 @@ function clearFormSearch() {
   renderFormList(allForms);
 }
 
-async function selectForm(uid, name) {
+async function selectForm(uid) {
   document.querySelectorAll('.form-list-item').forEach(el =>
     el.classList.toggle('selected', el.dataset.uid === uid)
   );
@@ -954,11 +953,16 @@ function resetConnStatus() {
   if (mainData.length && currentOp !== 'perms' && currentOp !== 'delete') buildMapping();
 }
 
-function setConnUI(state, text, iconChar) {
+const CONN_OK_ICON = '<svg width="16" height="16" fill="none" stroke="#0F6E56" stroke-width="2.5" viewBox="0 0 24 24" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><polyline points="8 12 11 15 16 9"/></svg>';
+
+// Always rebuilds the status markup, so it never depends on an element a previous call replaced
+function setConnUI(state, text) {
   const statusEl = document.getElementById('conn-status');
-  const textEl = document.getElementById('conn-status-text');
   statusEl.className = 'conn-status ' + state;
+  statusEl.innerHTML = (state === 'success' ? CONN_OK_ICON : '') + '<span id="conn-status-text"></span>';
+  const textEl = document.getElementById('conn-status-text');
   textEl.textContent = text;
+  if (state === 'success') textEl.style.fontWeight = '600';
 }
 
 async function testConnection() {
@@ -1090,10 +1094,7 @@ async function testConnection() {
         'Submissions may fail until the form is deployed.');
       connVerified = true; canSubmit = true;
     } else {
-      setConnUI('success', '\u2713 ' + escHtml(formName));
-      document.getElementById('conn-status').innerHTML =
-        '<svg width="16" height="16" fill="none" stroke="#0F6E56" stroke-width="2.5" viewBox="0 0 24 24" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><polyline points="8 12 11 15 16 9"/></svg>' +
-        '<span style="color:#0F6E56;font-weight:600">Connected</span>';
+      setConnUI('success', 'Connected');
       document.getElementById('badge-1').classList.add('done');
       document.getElementById('conn-info-box').style.display = 'none';
     }
